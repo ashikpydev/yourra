@@ -18,6 +18,7 @@ RUN pip install -r requirements.txt
 
 COPY backend ./backend
 COPY schema.sql ./schema.sql
+COPY run.py worker.py ./
 
 # Default data dir (mount a persistent volume here in LOCAL_MODE).
 RUN mkdir -p /data
@@ -27,5 +28,5 @@ ENV LOCAL_DB_PATH=/data/yourra_local.db \
 
 EXPOSE 8000
 
-# Honour the platform's $PORT (Railway/Render set it); default 8000 locally.
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Reads $PORT in Python (run.py) so we never depend on shell expansion.
+CMD ["python", "run.py"]
