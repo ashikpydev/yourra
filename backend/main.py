@@ -24,6 +24,9 @@ app = FastAPI(title="YourRA")
 
 app.mount("/static", StaticFiles(directory="backend/static"), name="static")
 templates = Jinja2Templates(directory="backend/templates")
+# Make contact details available to every template (e.g. the WhatsApp button).
+templates.env.globals["whatsapp_number"] = settings.WHATSAPP_NUMBER
+templates.env.globals["bkash_number"] = settings.BKASH_NUMBER
 
 app.include_router(auth_router.router)
 app.include_router(profile.router)

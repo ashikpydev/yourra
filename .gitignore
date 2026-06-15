@@ -36,3 +36,12 @@ Thumbs.db
 .vscode/
 .idea/
 tempCodeRunnerFile.py
+
+# ============================================================
+# Old prototype + personal files — not part of the app
+# (anchored with leading / so backend/ is never affected)
+# ============================================================
+/app.py
+/templates/
+/YourRA_PRD.docx
+/check_key.py

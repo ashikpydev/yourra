@@ -185,3 +185,25 @@ h1, h2, h3, h4, .font-display {
 /* ---------- Misc ---------- */
 .divider { height: 1px; background: var(--ink-100); }
 .muted { color: var(--ink-500); }
+
+/* ---------- Fade-in on load (safe: always ends visible) ---------- */
+@keyframes yrFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.reveal { animation: yrFadeUp .6s ease both; }
+
+/* ---------- Floating WhatsApp button ---------- */
+.wa-float {
+  position: fixed; right: 18px; bottom: 18px; width: 56px; height: 56px;
+  border-radius: 50%; background: #25D366; display: grid; place-items: center;
+  box-shadow: 0 8px 24px rgba(37, 211, 102, .45); z-index: 60;
+  transition: transform .15s ease, box-shadow .15s ease;
+  animation: yrPulse 2.4s ease-in-out infinite;
+}
+.wa-float:hover { transform: scale(1.08); box-shadow: 0 10px 30px rgba(37, 211, 102, .6); }
+@keyframes yrPulse { 0%,100% { box-shadow: 0 8px 24px rgba(37,211,102,.45);} 50% { box-shadow: 0 8px 30px rgba(37,211,102,.75);} }
+
+/* ---------- Payment badges + copy ---------- */
+.bkash-badge { display: inline-block; background: #e2136e; color: #fff; font-weight: 700; font-size: .78rem; padding: .15rem .5rem; border-radius: 6px; letter-spacing: .02em; }
+.wa-link { display: inline-flex; align-items: center; gap: .3rem; color: #1a8a4f; font-weight: 600; text-decoration: none; }
+.wa-link:hover { text-decoration: underline; }
+.copy-btn { font-size: .72rem; font-weight: 600; color: var(--brand-700); background: var(--brand-50); border: 1px solid var(--brand-100); border-radius: 6px; padding: .12rem .5rem; cursor: pointer; transition: background .15s ease; }
+.copy-btn:hover { background: var(--brand-100); }

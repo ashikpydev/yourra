@@ -76,6 +76,10 @@
           </div>
           <p x-show="uploadError" x-text="uploadError" class="text-rose-600 text-sm mt-3"></p>
         </form>
+        <div class="mt-4 flex items-start gap-2 rounded-lg p-3 text-xs" style="background:var(--brand-50);color:var(--ink-700)">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0 mt-0.5 text-indigo-600"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 11v5M12 7.5h.01"/></svg>
+          <span><strong>Accuracy note:</strong> Output quality depends on your audio. On clear recordings with little background noise and one person speaking at a time, YourRA reaches up to about 90&ndash;95% accuracy. Heavy noise, echo, or overlapping speech lowers this. We recommend a quick review before final use.</span>
+        </div>
       </div>
 
       <!-- Job history -->
@@ -118,12 +122,26 @@
       <div class="card card-pad">
         <h2 class="font-display font-bold mb-1">Top up credits</h2>
         <p class="text-xs muted mb-4">Manual bKash payment</p>
-        <ol class="text-sm muted space-y-1 mb-4 list-decimal list-inside">
-          <li>Send the bundle amount via bKash <strong>“Send Money”</strong> to <strong class="text-slate-700">{{ bkash_number or "your bKash number" }}</strong>.</li>
-          <li>Pick the bundle and paste your Transaction ID below.</li>
+        <ol class="text-sm muted space-y-1 mb-3 list-decimal list-inside">
+          <li>Send the amount via <span class="bkash-badge">bKash</span> “Send Money” to the number below.</li>
+          <li>Pick a bundle and paste your Transaction ID.</li>
           <li>We verify and activate your credits.</li>
         </ol>
-        {% if whatsapp_number %}<p class="text-xs muted mb-4">Urgent? WhatsApp <strong>{{ whatsapp_number }}</strong>.</p>{% endif %}
+        {% if bkash_number %}
+        <div class="flex items-center gap-2 mb-3 text-sm">
+          <span class="bkash-badge">bKash</span>
+          <strong class="text-slate-800">{{ bkash_number }}</strong>
+          <button type="button" class="copy-btn" onclick="copyText('{{ bkash_number }}', this)">Copy</button>
+        </div>
+        {% endif %}
+        {% if whatsapp_number %}
+        <p class="text-xs mb-4">Urgent?
+          <a class="wa-link" href="https://wa.me/88{{ whatsapp_number }}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 32 32" width="15" height="15" fill="#25D366" aria-hidden="true"><path d="M16 .5C7.4.5.5 7.4.5 16c0 2.8.7 5.4 2 7.7L.5 31.5l8-2.1c2.2 1.2 4.8 1.9 7.5 1.9 8.6 0 15.5-6.9 15.5-15.5S24.6.5 16 .5z"/></svg>
+            WhatsApp {{ whatsapp_number }}
+          </a>
+        </p>
+        {% endif %}
 
         <div class="space-y-2 mb-4">
           {% for b in bundles %}
