@@ -92,7 +92,7 @@ def build_transcript_docx(job: dict) -> bytes:
     title = doc.add_heading("Qualitative Research Transcript", level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     sub = doc.add_paragraph()
-    sr = sub.add_run("Prepared with YourRA — Bangla verbatim + English translation")
+    sr = sub.add_run("Prepared with YourRA. Bangla verbatim and English translation.")
     sr.italic = True
     sr.font.size = Pt(10)
     sr.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)

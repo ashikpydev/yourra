@@ -12,6 +12,7 @@ run_transcription_job() is invoked as a FastAPI BackgroundTask after
 6. Deducts credits from the user
 7. Cleans up local temp files
 """
+import asyncio
 import json
 import math
 import os
@@ -46,20 +47,23 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
     try:
         _update_job(job_id, status="processing", progress_pct=10)
 
-        # 1. Download original from R2
-        storage.download_to_path(r2_key, local_input)
+        # 1. Download original from R2 (in a thread so the web server stays free)
+        await asyncio.to_thread(storage.download_to_path, r2_key, local_input)
         print(f"[pipeline] job {job_id} downloaded audio", flush=True)
 
         # 2. Determine duration + chunk.
         # Cap processing to the user's available minutes (max_minutes) so a
         # 5-minute trial only transcribes the first 5 minutes, and paying
         # users never get billed/processed beyond their balance.
-        full_seconds = chunking.get_audio_duration_seconds(local_input)
+        full_seconds = await asyncio.to_thread(chunking.get_audio_duration_seconds, local_input)
         cap_seconds = (max_minutes * 60) if max_minutes else None
         effective_seconds = min(full_seconds, cap_seconds) if cap_seconds else full_seconds
         duration_minutes = max(1, math.ceil(effective_seconds / 60))
 
-        chunk_paths = chunking.split_on_silence_chunks(local_input, chunks_dir, max_seconds=cap_seconds)
+        # CPU-heavy splitting runs in a thread so many jobs process concurrently.
+        chunk_paths = await asyncio.to_thread(
+            chunking.split_on_silence_chunks, local_input, chunks_dir, cap_seconds
+        )
         total_chunks = len(chunk_paths)
 
         # Start time (seconds) of each chunk within the full recording, used for
@@ -67,7 +71,7 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
         offsets, running = [], 0.0
         for cp in chunk_paths:
             offsets.append(running)
-            running += chunking.get_audio_duration_seconds(cp)
+            running += await asyncio.to_thread(chunking.get_audio_duration_seconds, cp)
 
         print(f"[pipeline] job {job_id} split into {total_chunks} chunk(s); starting transcription", flush=True)
         _update_job(job_id, chunk_count=total_chunks, status="processing", progress_pct=15)
