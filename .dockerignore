@@ -1,0 +1,23 @@
+# Keep the build context small and never ship secrets or local data.
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+yourra_local.db
+yourra_local.db-journal
+local_storage/
+tmp_yourra/
+tmp/
+temp_transcriptions/
+.git/
+.gitignore
+*.md
+YourRA_PRD.docx
+check_key.py
+app.py
+templates/
+tempCodeRunnerFile.py

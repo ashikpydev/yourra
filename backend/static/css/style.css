@@ -1,0 +1,187 @@
+/* ============================================================
+   YourRA — Design System
+   A small, dependency-free stylesheet layered on top of Tailwind
+   (loaded via CDN). Defines brand tokens, typography, buttons,
+   cards, badges, and a few reusable components so the whole app
+   shares one cohesive, professional look.
+   ============================================================ */
+
+:root {
+  --brand-50:  #eef2ff;
+  --brand-100: #e0e7ff;
+  --brand-200: #c7d2fe;
+  --brand-300: #a5b4fc;
+  --brand-400: #818cf8;
+  --brand-500: #6366f1;
+  --brand-600: #4f46e5;
+  --brand-700: #4338ca;
+  --brand-800: #3730a3;
+  --brand-900: #312e81;
+
+  --ink-900: #0f172a;
+  --ink-700: #334155;
+  --ink-500: #64748b;
+  --ink-300: #cbd5e1;
+  --ink-100: #f1f5f9;
+  --ink-50:  #f8fafc;
+
+  --accent-emerald: #059669;
+  --accent-amber:   #d97706;
+  --accent-rose:    #e11d48;
+
+  --radius: 14px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06), 0 1px 3px rgba(15, 23, 42, .08);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, .08), 0 2px 4px -2px rgba(15, 23, 42, .06);
+  --shadow-lg: 0 18px 40px -12px rgba(49, 46, 129, .25);
+}
+
+* { -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink-900);
+  background: var(--ink-50);
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.bn-text {
+  font-family: 'Noto Sans Bengali', 'Inter', sans-serif;
+  line-height: 1.9;
+}
+
+/* ---------- Layout helpers ---------- */
+.container-page { max-width: 1120px; margin: 0 auto; padding-left: 1.25rem; padding-right: 1.25rem; }
+
+/* ---------- Brand wordmark ---------- */
+.brand-mark {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800;
+  font-size: 1.2rem; color: var(--ink-900); letter-spacing: -0.03em;
+}
+.brand-logo {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+  display: grid; place-items: center; color: #fff; font-weight: 800;
+  box-shadow: var(--shadow-md);
+}
+.brand-mark .accent { color: var(--brand-600); }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  font-weight: 600; font-size: .925rem; line-height: 1;
+  padding: .7rem 1.25rem; border-radius: 10px; cursor: pointer;
+  transition: transform .08s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease;
+  border: 1px solid transparent; text-decoration: none; white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-600), var(--brand-700));
+  color: #fff; box-shadow: var(--shadow-md);
+}
+.btn-primary:hover { box-shadow: var(--shadow-lg); }
+.btn-secondary {
+  background: #fff; color: var(--ink-900); border-color: var(--ink-300);
+  box-shadow: var(--shadow-sm);
+}
+.btn-secondary:hover { border-color: var(--brand-400); color: var(--brand-700); }
+.btn-success { background: var(--accent-emerald); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-success:hover { filter: brightness(1.05); }
+.btn-ghost { background: transparent; color: var(--ink-700); }
+.btn-ghost:hover { color: var(--brand-700); }
+.btn-danger { background: var(--accent-rose); color:#fff; }
+.btn[disabled], .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-lg { padding: .9rem 1.6rem; font-size: 1rem; border-radius: 12px; }
+.btn-sm { padding: .45rem .8rem; font-size: .8rem; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: #fff; border: 1px solid var(--ink-100);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+}
+.card-pad { padding: 1.5rem; }
+.card-hover { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.card-hover:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--brand-200); }
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .72rem; font-weight: 600; padding: .25rem .6rem; border-radius: 999px;
+  text-transform: capitalize;
+}
+.badge-gray   { background: var(--ink-100); color: var(--ink-700); }
+.badge-blue   { background: var(--brand-50); color: var(--brand-700); }
+.badge-green  { background: #ecfdf5; color: var(--accent-emerald); }
+.badge-amber  { background: #fffbeb; color: var(--accent-amber); }
+.badge-rose   { background: #fff1f2; color: var(--accent-rose); }
+.dot { width: .5rem; height: .5rem; border-radius: 999px; background: currentColor; display: inline-block; }
+
+/* ---------- Inputs ---------- */
+.field {
+  width: 100%; border: 1px solid var(--ink-300); border-radius: 10px;
+  padding: .65rem .8rem; font-size: .925rem; background: #fff;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field:focus { outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--brand-100); }
+.label { display:block; font-size: .82rem; font-weight: 600; color: var(--ink-700); margin-bottom: .35rem; }
+
+/* ---------- Hero / sections ---------- */
+.hero-bg {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(1200px 500px at 80% -10%, var(--brand-100), transparent 60%),
+    radial-gradient(900px 500px at 0% 0%, #f5f3ff, transparent 55%),
+    var(--ink-50);
+}
+.eyebrow {
+  display:inline-flex; align-items:center; gap:.5rem; font-size:.78rem; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase; color: var(--brand-700);
+  background: var(--brand-50); border:1px solid var(--brand-100);
+  padding:.35rem .75rem; border-radius:999px;
+}
+.section-title { font-size: 1.9rem; font-weight: 800; }
+
+/* ---------- Feature icon tile ---------- */
+.icon-tile {
+  width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--brand-50); color: var(--brand-700);
+}
+
+/* ---------- Progress bar ---------- */
+.track { width: 100%; height: 10px; background: var(--ink-100); border-radius: 999px; overflow: hidden; }
+.track > span {
+  display:block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-500), var(--brand-700));
+  transition: width .4s ease;
+}
+
+/* ---------- Nav ---------- */
+.site-nav { backdrop-filter: saturate(180%) blur(8px); background: rgba(255,255,255,.85); }
+.nav-link { color: var(--ink-700); font-weight: 500; font-size: .92rem; text-decoration: none; }
+.nav-link:hover { color: var(--brand-700); }
+
+/* ---------- Steps ---------- */
+.step-num {
+  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  font-weight: 800; color:#fff; background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+  box-shadow: var(--shadow-md);
+}
+
+/* ---------- Transcript pane ---------- */
+.transcript {
+  white-space: pre-wrap; font-size: .9rem; line-height: 1.75; color: var(--ink-700);
+  max-height: 520px; overflow-y: auto;
+}
+
+/* ---------- Footer ---------- */
+.site-footer { background: var(--ink-900); color: #cbd5e1; }
+.site-footer a { color: #cbd5e1; text-decoration: none; }
+.site-footer a:hover { color: #fff; }
+
+/* ---------- Misc ---------- */
+.divider { height: 1px; background: var(--ink-100); }
+.muted { color: var(--ink-500); }

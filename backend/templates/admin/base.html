@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YourRA · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="min-h-screen" style="background:var(--ink-50)">
+  <nav class="text-white" style="background:var(--ink-900)">
+    <div class="container-page flex items-center gap-1 h-14 overflow-x-auto">
+      <span class="brand-mark mr-4" style="color:#fff">
+        <span class="brand-logo">Y</span><span>Your<span style="color:var(--brand-300)">RA</span></span>
+      </span>
+      <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-4">Admin</span>
+      {% set nav = [('/admin','Dashboard'), ('/admin/users','Users'), ('/admin/payments','Payments'), ('/admin/jobs','Jobs'), ('/admin/requests','Service Requests')] %}
+      {% for href, label in nav %}
+      <a href="{{ href }}" class="px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/10 hover:text-white whitespace-nowrap {% if request.url.path == href %}bg-white/10 text-white{% endif %}">{{ label }}</a>
+      {% endfor %}
+      <a href="/" class="ml-auto text-sm text-slate-400 hover:text-white whitespace-nowrap">↗ View site</a>
+    </div>
+  </nav>
+  <main class="container-page py-8">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

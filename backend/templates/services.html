@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}RA Services — YourRA{% endblock %}
+{% block content %}
+<section class="hero-bg border-b border-slate-200">
+  <div class="container-page py-16 text-center">
+    <span class="eyebrow">Research-assistant services</span>
+    <h1 class="mt-4 text-4xl font-extrabold">A full research team, on demand</h1>
+    <p class="muted mt-3 max-w-2xl mx-auto">Beyond transcription, we support the whole research pipeline. Tell us what you need and we'll come back with a quote.</p>
+  </div>
+</section>
+
+<section class="container-page py-14">
+  <div class="grid sm:grid-cols-2 gap-6 mb-12">
+    {% set svc = [
+      ('SurveyCTO Setup','Form design, programming, skip logic, validation, testing, and deployment on SurveyCTO.'),
+      ('Data Processing','Cleaning, validation, recoding, and merging datasets across sources and survey rounds.'),
+      ('Data Analysis','Descriptive &amp; inferential analysis in Stata, R, SPSS, or Excel — with tables and visualizations.'),
+      ('Research Manuscript Writing','Drafting, editing, and formatting reports, papers, and manuscripts for submission.')
+    ] %}
+    {% for title, desc in svc %}
+    <div class="card card-pad card-hover flex gap-4">
+      <div class="icon-tile shrink-0">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-display font-bold">{{ title }}</h3>
+        <p class="muted text-sm mt-1">{{ desc }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if request.query_params.get('submitted') %}
+  <div class="max-w-2xl mx-auto mb-6 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-3 text-center text-sm">
+    ✓ Thanks! Your request has been submitted. We'll contact you shortly with a quote.
+  </div>
+  {% endif %}
+
+  <div class="card card-pad max-w-2xl mx-auto">
+    <h2 class="font-display text-lg font-bold mb-5">Request a service</h2>
+    <form action="/services/request" method="post" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="label">Service type</label>
+        <select name="service_type" required class="field">
+          <option value="surveycto">SurveyCTO Setup</option>
+          <option value="data_processing">Data Processing</option>
+          <option value="analysis">Data Analysis</option>
+          <option value="manuscript">Research Manuscript Writing</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Description</label>
+        <textarea name="description" rows="4" class="field" placeholder="Briefly describe your project — sample size, variables, deliverables, etc."></textarea>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="label">Estimated size</label>
+          <input type="text" name="estimated_size" placeholder="e.g. 500 surveys, 30 IDIs" class="field">
+        </div>
+        <div>
+          <label class="label">Deadline</label>
+          <input type="date" name="deadline" class="field">
+        </div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="label">Contact email *</label>
+          <input type="email" name="contact_email" required value="{{ user.email if user else '' }}" class="field">
+        </div>
+        <div>
+          <label class="label">WhatsApp number</label>
+          <input type="text" name="contact_whatsapp" class="field">
+        </div>
+      </div>
+      <div>
+        <label class="label">Attachment (optional)</label>
+        <input type="file" name="attachment" class="field">
+        <p class="text-xs muted mt-1">e.g. questionnaire draft, sample data, terms of reference.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit request</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

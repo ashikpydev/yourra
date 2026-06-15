@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}YourRA Pricing{% endblock %}
+{% block content %}
+<section class="container-page py-14" x-data="priceTools()">
+
+  <div class="text-center max-w-2xl mx-auto mb-10">
+    <span class="eyebrow">Pricing</span>
+    <h1 class="mt-4 text-4xl font-extrabold">Simple, honest pricing</h1>
+    <p class="muted mt-3">Bangla and English transcription with speaker labels, delivered as a Word report. Pay only for the minutes you use. Credits never expire.</p>
+  </div>
+
+  <!-- Bundles -->
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch max-w-5xl mx-auto">
+
+    {% for b in bundles %}
+    {% set popular = b.name == 'Value' %}
+    <div class="card card-pad flex flex-col"
+         style="{% if popular %}border:2px solid var(--brand-600);box-shadow:var(--shadow-lg){% endif %}">
+      {% if popular %}<span class="badge badge-blue self-start">Most popular</span>{% else %}<span class="text-sm font-semibold text-slate-500">{{ b.name }}</span>{% endif %}
+      <div class="text-4xl font-extrabold mt-3">৳{{ b.price_bdt }}</div>
+      <p class="muted text-sm mt-1">{{ b.minutes // 60 }} hours ({{ b.minutes }} minutes)</p>
+      <ul class="text-sm space-y-2 mt-5 flex-1">
+        <li class="flex gap-2"><span class="text-indigo-600">✓</span> Highest accuracy</li>
+        <li class="flex gap-2"><span class="text-indigo-600">✓</span> Bangla and English transcript</li>
+        <li class="flex gap-2"><span class="text-indigo-600">✓</span> Speaker labels</li>
+        <li class="flex gap-2"><span class="text-indigo-600">✓</span> Word and text download</li>
+      </ul>
+      <a href="{% if user %}/dashboard#topup{% else %}/signup{% endif %}" class="btn {% if popular %}btn-primary{% else %}btn-secondary{% endif %} mt-5">
+        {% if user %}Top up{% else %}Get started{% endif %}
+      </a>
+    </div>
+    {% endfor %}
+
+    <!-- Custom -->
+    <div class="card card-pad flex flex-col" style="border:1px dashed var(--ink-300)">
+      <span class="text-sm font-semibold text-slate-500">Custom</span>
+      <div class="text-4xl font-extrabold mt-3">৳<span x-text="customPrice.toLocaleString()"></span></div>
+      <p class="muted text-sm mt-1"><span x-text="customHours"></span> hours, your choice</p>
+      <div class="mt-5 flex-1">
+        <label class="label">How many hours?</label>
+        <input type="number" min="1" max="500" x-model.number="customHours" class="field">
+        <p class="text-xs muted mt-2">৳399 per hour, any amount.</p>
+      </div>
+      <a href="{% if user %}/dashboard#topup{% else %}/signup{% endif %}" class="btn btn-secondary mt-5">
+        {% if user %}Buy custom{% else %}Get started{% endif %}
+      </a>
+    </div>
+  </div>
+
+  <!-- Compact savings comparison -->
+  <div class="card card-pad max-w-3xl mx-auto mt-12">
+    <div class="sm:flex items-center justify-between gap-6">
+      <div>
+        <h2 class="font-display text-lg font-bold">How much you save</h2>
+        <p class="muted text-sm mt-1">A human RA takes about a day per hour of audio.</p>
+      </div>
+      <div class="flex items-end gap-3 mt-4 sm:mt-0">
+        <div>
+          <label class="label">Hours</label>
+          <input type="number" min="1" max="500" x-model.number="hours" class="field" style="width:90px">
+        </div>
+        <div>
+          <label class="label">RA cost/day</label>
+          <input type="number" min="0" step="50" x-model.number="raPerDay" class="field" style="width:110px">
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-3 mt-5 text-center">
+      <div class="rounded-xl py-3" style="background:var(--ink-50)">
+        <div class="text-xs muted">Human RA</div>
+        <div class="font-extrabold mt-1" x-text="'৳' + manualCost.toLocaleString()"></div>
+        <div class="text-xs muted" x-text="manualDays + ' days'"></div>
+      </div>
+      <div class="rounded-xl py-3" style="background:var(--brand-50)">
+        <div class="text-xs muted">YourRA</div>
+        <div class="font-extrabold mt-1 text-indigo-700" x-text="'৳' + totalAi.toLocaleString()"></div>
+        <div class="text-xs muted" x-text="aiDays + ' day' + (aiDays>1?'s':'')"></div>
+      </div>
+      <div class="rounded-xl py-3" style="background:#ecfdf5">
+        <div class="text-xs muted">You save</div>
+        <div class="font-extrabold mt-1 text-emerald-700" x-text="'৳' + saved.toLocaleString()"></div>
+        <div class="text-xs text-emerald-700" x-text="savedPct + '%'"></div>
+      </div>
+    </div>
+    <p class="text-xs muted text-center mt-3">Organizations outsourcing transcription often pay much more. Adjust the figures to your real rates.</p>
+  </div>
+
+  <!-- How to pay -->
+  <div class="card card-pad mt-10 max-w-3xl mx-auto text-center">
+    <h2 class="font-display text-xl font-bold mb-2">How payment works</h2>
+    <p class="muted text-sm">
+      Send the amount via bKash, then submit your Transaction ID from your dashboard. We verify it and
+      activate your credits, usually within a few hours.
+      {% if whatsapp_number %}<br>Need it faster? Message us on WhatsApp at <strong>{{ whatsapp_number }}</strong>.{% endif %}
+    </p>
+    <a href="{% if user %}/dashboard#topup{% else %}/signup{% endif %}" class="btn btn-primary mt-5">
+      {% if user %}Top up now{% else %}Sign up to get started{% endif %}
+    </a>
+  </div>
+
+  <script>
+  function priceTools() {
+    return {
+      RATE: 399,
+      customHours: 5,
+      get customPrice() { return Math.round(this.customHours * this.RATE); },
+      hours: 10, raPerDay: 700, throughput: 4,
+      get manualDays() { return this.hours; },
+      get manualCost() { return Math.round(this.hours * this.raPerDay); },
+      get aiDays() { return Math.max(1, Math.ceil(this.hours / this.throughput)); },
+      get raCost() { return Math.round(this.hours * this.raPerDay / this.throughput); },
+      get aiCost() { return Math.round(this.hours * this.RATE); },
+      get totalAi() { return this.raCost + this.aiCost; },
+      get saved() { return Math.max(0, this.manualCost - this.totalAi); },
+      get savedPct() { return this.manualCost ? Math.round(this.saved / this.manualCost * 100) : 0; },
+    };
+  }
+  </script>
+</section>
+{% endblock %}

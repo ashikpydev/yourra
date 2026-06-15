@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}YourRA Dashboard{% endblock %}
+{% block content %}
+<section class="container-page py-8" x-data="dashboard()" x-init="init()">
+
+  <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-extrabold">Dashboard</h1>
+      <p class="muted text-sm">{{ user.email }}</p>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-6">
+
+    <!-- Left column: credits + upload -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- Credits -->
+      <div class="card card-pad">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="font-display font-bold">Your credits</h2>
+          <span class="text-sm"><span class="text-2xl font-extrabold text-indigo-700" x-text="profile.credits_minutes"></span> <span class="muted">min remaining</span></span>
+        </div>
+        <div class="track"><span :style="`width:${barWidth()}%`"></span></div>
+        <p class="text-xs muted mt-2" x-show="profile.credits_minutes <= 0">
+          You're out of credits. <a href="#topup" class="text-indigo-600 font-medium">Top up below</a>.
+        </p>
+      </div>
+
+      <!-- Upload -->
+      <div class="card card-pad">
+        <h2 class="font-display font-bold mb-1">Upload audio for transcription</h2>
+        <p class="text-xs muted mb-1">MP3, WAV, M4A, OGG or MP4, up to {{ max_upload_mb }}MB. Bangla and English with speaker labels.</p>
+        <p class="text-xs mb-4"><span class="font-semibold text-indigo-700" x-text="profile.credits_minutes + ' minutes remaining'"></span><span class="muted">. Only your remaining minutes are transcribed; a longer file is trimmed to that length.</span></p>
+        <form @submit.prevent="upload">
+          <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-xl py-8 px-4 cursor-pointer hover:border-indigo-400 transition"
+                 :class="fileName ? 'border-indigo-400 bg-indigo-50/40' : ''">
+            <svg width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            <span class="text-sm font-medium text-slate-600" x-text="fileName || 'Click to choose an audio file'"></span>
+            <input type="file" name="audio" x-ref="fileInput" accept=".mp3,.wav,.m4a,.ogg,.mp4" required class="hidden"
+                   @change="fileName = $refs.fileInput.files[0]?.name || ''">
+          </label>
+
+          <div class="mt-4">
+            <button type="button" class="text-sm text-indigo-600 font-medium" @click="showMeta = !showMeta">
+              <span x-show="!showMeta">Add survey and respondent details (for the Word report)</span>
+              <span x-show="showMeta">Hide details</span>
+            </button>
+            <div x-show="showMeta" x-cloak class="grid sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label class="label">Survey type</label>
+                <select x-model="meta.survey_type" class="field">
+                  <option value="">Select</option><option>IDI</option><option>FGD</option><option>KII</option><option>Case Study</option><option>Survey</option><option>Other</option>
+                </select>
+              </div>
+              <div><label class="label">Respondent name / ID</label><input x-model="meta.resp_name" class="field"></div>
+              <div><label class="label">Age</label><input x-model="meta.resp_age" class="field"></div>
+              <div>
+                <label class="label">Sex</label>
+                <select x-model="meta.resp_sex" class="field"><option value="">Select</option><option>Female</option><option>Male</option><option>Other</option></select>
+              </div>
+              <div><label class="label">Education</label><input x-model="meta.resp_education" class="field"></div>
+              <div><label class="label">Profession</label><input x-model="meta.resp_profession" class="field"></div>
+              <div><label class="label">Location</label><input x-model="meta.resp_location" class="field"></div>
+              <div><label class="label">Interviewer / Moderator</label><input x-model="meta.interviewer" class="field"></div>
+              <div><label class="label">Interview date</label><input type="date" x-model="meta.interview_date" class="field"></div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex items-center gap-3">
+            <button type="submit" :disabled="uploading || profile.credits_minutes <= 0" class="btn btn-primary">
+              <span x-show="!uploading">Upload &amp; transcribe</span>
+              <span x-show="uploading">Uploading…</span>
+            </button>
+            <span class="text-xs muted" x-show="profile.credits_minutes <= 0">Top up to enable uploads.</span>
+          </div>
+          <p x-show="uploadError" x-text="uploadError" class="text-rose-600 text-sm mt-3"></p>
+        </form>
+      </div>
+
+      <!-- Job history -->
+      <div class="card card-pad">
+        <h2 class="font-display font-bold mb-4">Your transcriptions</h2>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left muted border-b border-slate-100">
+              <tr>
+                <th class="py-2 pr-4 font-medium">File</th>
+                <th class="py-2 pr-4 font-medium">Status</th>
+                <th class="py-2 pr-4 font-medium">Progress</th>
+                <th class="py-2 pr-4 font-medium">Duration</th>
+                <th class="py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="job in jobs" :key="job.id">
+                <tr class="border-b border-slate-50 last:border-0">
+                  <td class="py-3 pr-4 font-medium text-slate-700 max-w-[200px] truncate" x-text="job.original_filename"></td>
+                  <td class="py-3 pr-4">
+                    <span class="badge" :class="badgeClass(job.status)"><span class="dot"></span><span x-text="job.status"></span></span>
+                  </td>
+                  <td class="py-3 pr-4 muted" x-text="job.progress_pct + '%'"></td>
+                  <td class="py-3 pr-4 muted" x-text="job.duration_minutes ? job.duration_minutes + ' min' : '-'"></td>
+                  <td class="py-3 text-right"><a :href="'/jobs/' + job.id" class="text-indigo-600 font-medium">View →</a></td>
+                </tr>
+              </template>
+              <tr x-show="jobs.length === 0">
+                <td colspan="5" class="py-8 muted text-center">No transcriptions yet. Upload your first audio file above.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: top up -->
+    <div id="topup" class="space-y-6">
+      <div class="card card-pad">
+        <h2 class="font-display font-bold mb-1">Top up credits</h2>
+        <p class="text-xs muted mb-4">Manual bKash payment</p>
+        <ol class="text-sm muted space-y-1 mb-4 list-decimal list-inside">
+          <li>Send the bundle amount via bKash <strong>“Send Money”</strong> to <strong class="text-slate-700">{{ bkash_number or "your bKash number" }}</strong>.</li>
+          <li>Pick the bundle and paste your Transaction ID below.</li>
+          <li>We verify and activate your credits.</li>
+        </ol>
+        {% if whatsapp_number %}<p class="text-xs muted mb-4">Urgent? WhatsApp <strong>{{ whatsapp_number }}</strong>.</p>{% endif %}
+
+        <div class="space-y-2 mb-4">
+          {% for b in bundles %}
+          <label class="flex items-center justify-between border rounded-xl px-3 py-2.5 cursor-pointer hover:border-indigo-400 transition"
+                 :class="selectedBundle === '{{ b.name }}' ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/40' : 'border-slate-200'">
+            <span>
+              <input type="radio" name="bundle" value="{{ b.name }}" x-model="selectedBundle" class="hidden">
+              <span class="font-semibold text-sm">{{ b.name }}</span>
+              <span class="muted text-xs block">{{ b.minutes }} min</span>
+            </span>
+            <span class="font-bold">৳{{ b.price_bdt }}</span>
+          </label>
+          {% endfor %}
+          <label class="flex items-center justify-between border rounded-xl px-3 py-2.5 cursor-pointer hover:border-indigo-400 transition"
+                 :class="selectedBundle === 'Custom' ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/40' : 'border-slate-200'">
+            <span>
+              <input type="radio" name="bundle" value="Custom" x-model="selectedBundle" class="hidden">
+              <span class="font-semibold text-sm">Custom</span>
+              <span class="muted text-xs block">choose your hours</span>
+            </span>
+            <span class="font-bold">৳<span x-text="customPrice.toLocaleString()"></span></span>
+          </label>
+        </div>
+
+        <div x-show="selectedBundle === 'Custom'" x-cloak class="mb-4">
+          <label class="label">How many hours?</label>
+          <input type="number" min="1" max="500" x-model.number="customHours" class="field">
+          <p class="text-xs muted mt-1">৳399 per hour. Total ৳<span x-text="customPrice.toLocaleString()"></span> for <span x-text="customHours"></span> hours.</p>
+        </div>
+
+        <form @submit.prevent="topup">
+          <label class="label">bKash Transaction ID</label>
+          <input type="text" x-model="trxId" required placeholder="e.g. 9XJ4K2L1A0" class="field mb-3">
+          <button type="submit" :disabled="!selectedBundle || !trxId || toppingUp || (selectedBundle==='Custom' && (!customHours || customHours<1))" class="btn btn-success w-full">
+            <span x-show="!toppingUp">Submit payment</span>
+            <span x-show="toppingUp">Submitting…</span>
+          </button>
+        </form>
+        <p x-show="topupMessage" x-text="topupMessage" class="text-emerald-700 text-sm mt-3"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+function dashboard() {
+  return {
+    profile: { credits_minutes: {{ user.credits_minutes }}, trial_used: {{ 'true' if user.trial_used else 'false' }} },
+    jobs: {{ jobs | tojson }},
+    maxSeen: Math.max({{ user.credits_minutes }}, 1),
+    uploading: false,
+    uploadError: '',
+    fileName: '',
+    showMeta: false,
+    meta: { survey_type:'', resp_name:'', resp_age:'', resp_sex:'', resp_education:'', resp_profession:'', resp_location:'', interviewer:'', interview_date:'' },
+    selectedBundle: '',
+    customHours: 5,
+    get customPrice() { return Math.round(this.customHours * 399); },
+    trxId: '',
+    toppingUp: false,
+    topupMessage: '',
+    pollHandle: null,
+
+    init() {
+      this.pollHandle = setInterval(() => this.refresh(), 8000);
+    },
+
+    barWidth() {
+      this.maxSeen = Math.max(this.maxSeen, this.profile.credits_minutes, 1);
+      return Math.min(100, (this.profile.credits_minutes / this.maxSeen) * 100);
+    },
+
+    badgeClass(status) {
+      return {
+        completed: 'badge-green',
+        failed: 'badge-rose',
+        pending: 'badge-gray',
+        processing: 'badge-amber',
+        merging: 'badge-amber',
+      }[status] || 'badge-gray';
+    },
+
+    async refresh() {
+      const [p, j] = await Promise.all([
+        fetch('/api/profile').then(r => r.json()),
+        fetch('/api/jobs').then(r => r.json()),
+      ]);
+      this.profile = p;
+      this.jobs = j;
+    },
+
+    getDuration(file) {
+      return new Promise((resolve) => {
+        try {
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('audio');
+          a.preload = 'metadata';
+          a.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(a.duration || 0); };
+          a.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+          a.src = url;
+        } catch (e) { resolve(0); }
+      });
+    },
+
+    async upload() {
+      const file = this.$refs.fileInput.files[0];
+      if (!file) return;
+      this.uploadError = '';
+      const left = this.profile.credits_minutes;
+      if (left <= 0) {
+        this.uploadError = 'You have 0 minutes left. Please top up below before uploading.';
+        return;
+      }
+      const durSec = await this.getDuration(file);
+      if (durSec) {
+        const audioMin = Math.ceil(durSec / 60);
+        if (audioMin > left) {
+          if (!confirm(`This file is about ${audioMin} min, but you have only ${left} min remaining. Only the FIRST ${left} minute(s) will be transcribed. Continue?`)) {
+            return;
+          }
+        }
+      }
+      this.uploading = true;
+      const form = new FormData();
+      form.append('audio', file);
+      for (const [k, v] of Object.entries(this.meta)) { if (v) form.append(k, v); }
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+        this.$refs.fileInput.value = '';
+        this.fileName = '';
+        await this.refresh();
+      } catch (e) {
+        this.uploadError = e.message;
+      } finally {
+        this.uploading = false;
+      }
+    },
+
+    async topup() {
+      this.toppingUp = true;
+      this.topupMessage = '';
+      const form = new FormData();
+      form.append('bundle_name', this.selectedBundle);
+      form.append('bkash_trx_id', this.trxId);
+      if (this.selectedBundle === 'Custom') form.append('custom_minutes', this.customHours * 60);
+      try {
+        const res = await fetch('/api/topup', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Submission failed');
+        this.topupMessage = data.message;
+        this.trxId = '';
+        this.selectedBundle = '';
+      } catch (e) {
+        this.topupMessage = e.message;
+      } finally {
+        this.toppingUp = false;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+# ============================================================
+# SECRETS — never commit these
+# ============================================================
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ============================================================
+# Local-mode data (generated at runtime, machine-specific)
+# ============================================================
+yourra_local.db
+yourra_local.db-journal
+local_storage/
+tmp_yourra/
+tmp/
+temp_transcriptions/
+
+# ============================================================
+# Python
+# ============================================================
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ============================================================
+# OS / editor junk
+# ============================================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+tempCodeRunnerFile.py

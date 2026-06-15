@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}YourRA Login{% endblock %}
+{% block content %}
+<section class="container-page py-16 flex justify-center">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-extrabold">Welcome back</h1>
+      <p class="muted text-sm mt-1">Log in to upload audio and manage your credits.</p>
+    </div>
+    <div class="card card-pad" x-data="{ loading: false }">
+      <form action="/login" method="post" @submit="loading = true">
+        <label class="label">Email</label>
+        <input type="email" name="email" required class="field mb-4">
+        <label class="label">Password</label>
+        <input type="password" name="password" required class="field mb-5">
+        <button type="submit" :disabled="loading" class="btn btn-primary w-full">
+          <span x-show="!loading">Log in</span>
+          <span x-show="loading">Logging in…</span>
+        </button>
+      </form>
+    </div>
+    <p class="text-center text-sm muted mt-5">
+      No account yet? <a href="/signup" class="text-indigo-600 font-medium">Sign up</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

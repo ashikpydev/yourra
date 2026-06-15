@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h1 class="text-2xl font-extrabold mb-6">Service requests</h1>
+<div class="space-y-4">
+  {% set rbadge = {'new':'badge-blue','quoted':'badge-amber','accepted':'badge-green','in_progress':'badge-amber','delivered':'badge-green','cancelled':'badge-rose'} %}
+  {% for r in requests %}
+  <div class="card card-pad">
+    <div class="flex justify-between items-start gap-3">
+      <div>
+        <div class="font-display font-bold capitalize">{{ r.service_type.replace('_',' ') }}</div>
+        <div class="text-sm muted">{{ r.contact_email }}{% if r.contact_whatsapp %} · WA: {{ r.contact_whatsapp }}{% endif %}</div>
+        <div class="text-sm muted">Submitted {{ r.created_at }}{% if r.deadline %} · Deadline {{ r.deadline }}{% endif %}</div>
+      </div>
+      <span class="badge {{ rbadge.get(r.status, 'badge-gray') }}">{{ r.status.replace('_',' ') }}</span>
+    </div>
+    {% if r.description %}<p class="mt-3 text-sm whitespace-pre-wrap text-slate-700">{{ r.description }}</p>{% endif %}
+    {% if r.estimated_size %}<p class="mt-1 text-sm muted">Size: {{ r.estimated_size }}</p>{% endif %}
+    <form action="/admin/requests/{{ r.id }}/update" method="post" class="mt-4 flex flex-wrap gap-3 items-end">
+      <div>
+        <label class="label">Status</label>
+        <select name="status" class="field" style="width:150px">
+          {% for s in ["new", "quoted", "accepted", "in_progress", "delivered", "cancelled"] %}
+          <option value="{{ s }}" {% if r.status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label">Quoted price</label>
+        <input type="text" name="quoted_price" value="{{ r.quoted_price or '' }}" class="field" style="width:140px">
+      </div>
+      <div class="flex-1 min-w-[200px]">
+        <label class="label">Admin notes</label>
+        <input type="text" name="admin_notes" value="{{ r.admin_notes or '' }}" class="field">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="card card-pad muted text-center">No service requests yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

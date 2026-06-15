@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Hero -->
+<section class="hero-bg border-b border-slate-200">
+  <div class="container-page py-20 md:py-28 text-center">
+    <span class="eyebrow">For qualitative researchers</span>
+    <h1 class="mt-5 text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight max-w-4xl mx-auto">
+      Bangla interviews, transcribed and
+      <span style="background:linear-gradient(135deg,var(--brand-600),var(--brand-800));-webkit-background-clip:text;background-clip:text;color:transparent;">translated</span>
+    </h1>
+    <p class="mt-5 text-lg muted max-w-2xl mx-auto">
+      Upload your audio and get a clean Bangla transcript with English translation and speaker labels,
+      delivered as a ready-to-use Word document.
+    </p>
+    <div class="mt-9 flex flex-wrap justify-center gap-3">
+      <a href="/signup" class="btn btn-primary btn-lg">Get started</a>
+      <a href="/pricing" class="btn btn-secondary btn-lg">View pricing</a>
+    </div>
+  </div>
+</section>
+
+<!-- Trust strip -->
+<section class="container-page py-10">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+    <div><div class="text-xl font-extrabold text-slate-900">Bangla and English</div><div class="text-xs muted mt-1">every transcript</div></div>
+    <div><div class="text-xl font-extrabold text-slate-900">Speaker labels</div><div class="text-xs muted mt-1">moderator and participants</div></div>
+    <div><div class="text-xl font-extrabold text-slate-900">Word and text</div><div class="text-xs muted mt-1">ready to hand over</div></div>
+    <div><div class="text-xl font-extrabold text-slate-900">Hours of audio</div><div class="text-xs muted mt-1">in one upload</div></div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="container-page py-12">
+  <div class="text-center max-w-2xl mx-auto mb-10">
+    <h2 class="section-title">Everything you need from a transcript</h2>
+    <p class="muted mt-3">Built for IDIs, FGDs, KIIs and case studies.</p>
+  </div>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="card card-pad card-hover">
+      <div class="icon-tile">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h7"/></svg>
+      </div>
+      <h3 class="font-display font-bold text-lg mt-4">Accurate Bangla and English</h3>
+      <p class="muted text-sm mt-2">A faithful Bangla verbatim transcript plus a natural English translation for every file.</p>
+    </div>
+    <div class="card card-pad card-hover">
+      <div class="icon-tile">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-1a6 6 0 0 1 12 0v1M18 11l2 2 3-3"/></svg>
+      </div>
+      <h3 class="font-display font-bold text-lg mt-4">Speaker labels</h3>
+      <p class="muted text-sm mt-2">Every line is labelled by speaker, so the moderator and participants are easy to follow.</p>
+    </div>
+    <div class="card card-pad card-hover">
+      <div class="icon-tile">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 4h8l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm8 0v4h4M9 13h6M9 17h6"/></svg>
+      </div>
+      <h3 class="font-display font-bold text-lg mt-4">Ready-to-use Word report</h3>
+      <p class="muted text-sm mt-2">Download a polished Word document that opens with a respondent demographic table, ready to hand over.</p>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how" class="container-page py-16 scroll-mt-20">
+  <div class="text-center max-w-2xl mx-auto mb-12">
+    <span class="eyebrow">How it works</span>
+    <h2 class="section-title mt-4">From audio to transcript in four steps</h2>
+  </div>
+  <div class="grid md:grid-cols-4 gap-8">
+    {% set steps = [
+      ('1','Create your account','Sign up in seconds with your email.'),
+      ('2','Upload your audio','MP3, WAV, M4A, OGG or MP4, up to several hours.'),
+      ('3','We transcribe and translate','You get Bangla verbatim and English, with speaker labels and timestamps.'),
+      ('4','Download your report','A ready-to-use Word document, plus text files.')
+    ] %}
+    {% for num, title, desc in steps %}
+    <div class="relative">
+      <div class="step-num">{{ num }}</div>
+      <h3 class="font-display font-bold mt-4">{{ title }}</h3>
+      <p class="muted text-sm mt-2">{{ desc }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Savings highlight -->
+<section class="container-page py-12">
+  <div class="card card-pad" style="background:linear-gradient(135deg,var(--brand-700),var(--brand-900));border:none;color:#fff">
+    <div class="md:flex items-center justify-between gap-8 px-2 py-2">
+      <div>
+        <h2 class="font-display text-2xl font-extrabold">A fraction of the cost of manual transcription</h2>
+        <p class="text-indigo-100 mt-2 max-w-xl">A research assistant needs about a day per hour of audio. YourRA delivers it in minutes, at ৳399 per hour.</p>
+      </div>
+      <a href="/pricing" class="btn btn-secondary btn-lg mt-5 md:mt-0">See pricing and savings</a>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section class="container-page py-16 text-center">
+  <h2 class="section-title">Ready to get started?</h2>
+  <p class="muted mt-3 max-w-xl mx-auto">Create your account and our team will set you up with access.</p>
+  <a href="/signup" class="btn btn-primary btn-lg mt-7">Create your account</a>
+</section>
+
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h1 class="text-2xl font-extrabold mb-6">bKash top-up requests</h1>
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="text-left muted border-b border-slate-100">
+      <tr>
+        <th class="px-4 py-3 font-medium">User</th>
+        <th class="px-4 py-3 font-medium">Bundle</th>
+        <th class="px-4 py-3 font-medium">Minutes</th>
+        <th class="px-4 py-3 font-medium">Price</th>
+        <th class="px-4 py-3 font-medium">bKash TrxID</th>
+        <th class="px-4 py-3 font-medium">Status</th>
+        <th class="px-4 py-3 font-medium">Submitted</th>
+        <th class="px-4 py-3 font-medium">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in payments %}
+      <tr class="border-b border-slate-50 last:border-0">
+        <td class="px-4 py-3 text-slate-700">{{ p.email }}</td>
+        <td class="px-4 py-3">{{ p.bundle_name }}</td>
+        <td class="px-4 py-3 muted">{{ p.bundle_minutes }}</td>
+        <td class="px-4 py-3">৳{{ p.bundle_price_bdt }}</td>
+        <td class="px-4 py-3 font-mono text-xs">{{ p.bkash_trx_id }}</td>
+        <td class="px-4 py-3">
+          {% if p.status == "pending" %}<span class="badge badge-amber">Pending</span>
+          {% elif p.status == "approved" %}<span class="badge badge-green">Approved</span>
+          {% else %}<span class="badge badge-rose">Rejected</span>{% endif %}
+        </td>
+        <td class="px-4 py-3 muted">{{ p.created_at }}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          {% if p.status == "pending" %}
+          <form action="/admin/payments/{{ p.id }}/approve" method="post" class="inline">
+            <button type="submit" class="btn btn-success btn-sm">Approve</button>
+          </form>
+          <form action="/admin/payments/{{ p.id }}/reject" method="post" class="inline">
+            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+          </form>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td class="px-4 py-6 muted text-center" colspan="8">No top-up requests yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

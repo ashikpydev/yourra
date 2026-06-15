@@ -1,0 +1,70 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h1 class="text-2xl font-extrabold mb-6">Users</h1>
+
+{% if request.query_params.get('msg') %}
+<div class="mb-5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 px-4 py-3 text-sm">{{ request.query_params.get('msg') }}</div>
+{% endif %}
+
+<!-- Add user -->
+<div class="card card-pad mb-6">
+  <h2 class="font-display font-bold mb-1">Add a user</h2>
+  <p class="text-xs muted mb-4">Creates a new account, grants the minutes you set, and emails the person their login. (To top up someone who already has an account, use "Manually activate credits" on the dashboard.)</p>
+  <form action="/admin/users/add" method="post" class="flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="label">Email</label>
+      <input type="email" name="email" required class="field" style="width:260px">
+    </div>
+    <div>
+      <label class="label">Starting minutes</label>
+      <input type="number" name="minutes" value="0" min="0" class="field" style="width:140px">
+    </div>
+    <button type="submit" class="btn btn-primary">Create and email</button>
+  </form>
+</div>
+
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="text-left muted border-b border-slate-100">
+      <tr>
+        <th class="px-4 py-3 font-medium">Email</th>
+        <th class="px-4 py-3 font-medium">Credits (min)</th>
+        <th class="px-4 py-3 font-medium">Status</th>
+        <th class="px-4 py-3 font-medium">Joined</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="border-b border-slate-50 last:border-0">
+        <td class="px-4 py-3 font-medium text-slate-700">{{ u.email }}</td>
+        <td class="px-4 py-3 font-mono">{{ u.credits_minutes }}</td>
+        <td class="px-4 py-3">
+          {% if u.is_active == 0 %}<span class="badge badge-rose">Paused</span>{% else %}<span class="badge badge-green">Active</span>{% endif %}
+        </td>
+        <td class="px-4 py-3 muted">{{ u.created_at }}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          {% if u.is_active == 0 %}
+          <form action="/admin/users/unpause" method="post" class="inline">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <button class="btn btn-secondary btn-sm">Unpause</button>
+          </form>
+          {% else %}
+          <form action="/admin/users/pause" method="post" class="inline">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <button class="btn btn-secondary btn-sm">Pause</button>
+          </form>
+          {% endif %}
+          <form action="/admin/users/delete" method="post" class="inline" onsubmit="return confirm('Delete {{ u.email }} and all their jobs? This cannot be undone.');">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <button class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td class="px-4 py-6 muted text-center" colspan="5">No users yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

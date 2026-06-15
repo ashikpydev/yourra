@@ -1,0 +1,155 @@
+"""
+YourRA — FastAPI application entrypoint.
+
+Mounts:
+- /            marketing/landing + auth pages + dashboard (Jinja2 templates)
+- /api/*       transcription, profile, bundles, topup (transcription.py, profile.py)
+- /signup,/login,/logout   auth (auth_router.py)
+- /admin/*     admin panel (HTTP Basic Auth) (admin.py)
+"""
+import uuid
+
+from fastapi import FastAPI, Request, Depends, Form, UploadFile, File
+from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from backend.auth import get_current_user
+from backend.config import settings
+from backend.database import supabase_admin
+from backend.routers import auth_router, profile, transcription, admin
+from backend.services import storage
+
+app = FastAPI(title="YourRA")
+
+app.mount("/static", StaticFiles(directory="backend/static"), name="static")
+templates = Jinja2Templates(directory="backend/templates")
+
+app.include_router(auth_router.router)
+app.include_router(profile.router)
+app.include_router(transcription.router)
+app.include_router(admin.router)
+
+
+async def get_optional_user(request: Request):
+    try:
+        return await get_current_user(request)
+    except Exception:
+        return None
+
+
+@app.get("/", response_class=HTMLResponse)
+async def landing(request: Request):
+    user = await get_optional_user(request)
+    if user:
+        return RedirectResponse(url="/dashboard")
+    return templates.TemplateResponse("landing.html", {"request": request})
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    user = await get_optional_user(request)
+    if user:
+        return RedirectResponse(url="/dashboard")
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    user = await get_optional_user(request)
+    if user:
+        return RedirectResponse(url="/dashboard")
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, user=Depends(get_current_user)):
+    jobs = (
+        supabase_admin.table("transcription_jobs")
+        .select("id, status, progress_pct, original_filename, duration_minutes, "
+                "credits_used, model_used, created_at")
+        .eq("user_id", user["_auth_user_id"])
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+    )
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request,
+            "user": user,
+            "jobs": jobs.data,
+            "bundles": transcription.BUNDLES,
+            "bkash_number": settings.BKASH_NUMBER,
+            "whatsapp_number": settings.WHATSAPP_NUMBER,
+            "max_upload_mb": settings.MAX_UPLOAD_MB,
+        },
+    )
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+async def job_result_page(request: Request, job_id: str, user=Depends(get_current_user)):
+    result = (
+        supabase_admin.table("transcription_jobs")
+        .select("*")
+        .eq("id", job_id)
+        .eq("user_id", user["_auth_user_id"])
+        .execute()
+    )
+    job = result.data[0] if result.data else None
+    return templates.TemplateResponse(
+        "result.html", {"request": request, "user": user, "job": job, "job_id": job_id}
+    )
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+async def pricing(request: Request):
+    user = await get_optional_user(request)
+    return templates.TemplateResponse(
+        "pricing.html",
+        {"request": request, "user": user, "bundles": transcription.BUNDLES,
+         "whatsapp_number": settings.WHATSAPP_NUMBER},
+    )
+
+
+@app.get("/services", response_class=HTMLResponse)
+async def services_page(request: Request):
+    user = await get_optional_user(request)
+    return templates.TemplateResponse("services.html", {"request": request, "user": user})
+
+
+@app.post("/services/request")
+async def submit_service_request(
+    service_type: str = Form(...),
+    description: str = Form(""),
+    estimated_size: str = Form(""),
+    deadline: str = Form(""),
+    contact_email: str = Form(...),
+    contact_whatsapp: str = Form(""),
+    attachment: UploadFile = File(None),
+):
+    attachment_key = None
+    if attachment and attachment.filename:
+        attachment_key = f"service_requests/{uuid.uuid4()}/{attachment.filename}"
+        storage.upload_fileobj(attachment.file, attachment_key, content_type=attachment.content_type)
+
+    supabase_admin.table("service_requests").insert(
+        {
+            "service_type": service_type,
+            "description": description or None,
+            "estimated_size": estimated_size or None,
+            "deadline": deadline or None,
+            "contact_email": contact_email,
+            "contact_whatsapp": contact_whatsapp or None,
+            "attachment_r2_key": attachment_key,
+            "status": "new",
+        }
+    ).execute()
+
+    return RedirectResponse(url="/services?submitted=1", status_code=303)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+# end of YourRA application entrypoint

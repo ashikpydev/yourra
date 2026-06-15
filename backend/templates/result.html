@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}YourRA Transcript{% endblock %}
+{% block content %}
+<section class="container-page py-8" x-data="resultPage()" x-init="init()">
+  <a href="/dashboard" class="text-sm text-indigo-600 font-medium">← Back to dashboard</a>
+
+  {% if not job %}
+  <div class="card card-pad text-center muted mt-4">Job not found.</div>
+  {% else %}
+  <div class="card card-pad mt-4 mb-6">
+    <div class="flex justify-between items-start flex-wrap gap-3">
+      <div>
+        <h1 class="text-xl font-extrabold">{{ job.original_filename }}</h1>
+        <p class="text-sm muted mt-1">Submitted {{ job.created_at }}</p>
+      </div>
+      <span class="badge" :class="badgeClass(status)"><span class="dot"></span><span x-text="status"></span></span>
+    </div>
+
+    <div class="mt-5" x-show="status !== 'completed' && status !== 'failed'">
+      <div class="track"><span :style="`width:${progress}%`"></span></div>
+      <p class="text-sm muted mt-2">Processing. This page updates automatically every few seconds.</p>
+    </div>
+
+    <div x-show="status === 'failed'" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm px-4 py-3" x-text="errorMessage || 'Transcription failed. Please try again or contact support.'"></div>
+
+    <div x-show="status === 'completed'" class="mt-5 flex gap-3 flex-wrap items-center">
+      <a :href="'/api/download/{{ job_id }}/docx'" class="btn btn-primary btn-sm">⬇ Word report (.docx)</a>
+      <span class="text-xs muted">ready to hand over, with the demographic table</span>
+      <span class="w-full"></span>
+      <a :href="'/api/download/{{ job_id }}/bn'" class="btn btn-secondary btn-sm">Bangla (.txt)</a>
+      <a :href="'/api/download/{{ job_id }}/en'" class="btn btn-secondary btn-sm">English (.txt)</a>
+      <a :href="'/api/download/{{ job_id }}/combined'" class="btn btn-secondary btn-sm">Combined (.txt)</a>
+    </div>
+  </div>
+
+  <div x-show="status === 'completed'" class="grid md:grid-cols-2 gap-6">
+    <div class="card card-pad">
+      <h2 class="font-display font-bold mb-3">Bangla verbatim</h2>
+      <div class="transcript bn-text" x-text="transcriptBn"></div>
+    </div>
+    <div class="card card-pad">
+      <h2 class="font-display font-bold mb-3">English translation</h2>
+      <div class="transcript" x-text="transcriptEn"></div>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<script>
+function resultPage() {
+  return {
+    status: "{{ job.status if job else '' }}",
+    progress: {{ job.progress_pct if job else 0 }},
+    errorMessage: {{ (job.error_message if job else '') | tojson }},
+    transcriptBn: {{ (job.transcript_bn if job else '') | tojson }},
+    transcriptEn: {{ (job.transcript_en if job else '') | tojson }},
+    poller: null,
+
+    badgeClass(status) {
+      return {
+        completed: 'badge-green', failed: 'badge-rose', pending: 'badge-gray',
+        processing: 'badge-amber', merging: 'badge-amber',
+      }[status] || 'badge-gray';
+    },
+
+    init() {
+      if (this.status && this.status !== 'completed' && this.status !== 'failed') {
+        this.poller = setInterval(() => this.poll(), 5000);
+      }
+    },
+
+    async poll() {
+      const res = await fetch('/api/status/{{ job_id }}');
+      const data = await res.json();
+      this.status = data.status;
+      this.progress = data.progress_pct;
+      this.errorMessage = data.error_message;
+      if (this.status === 'completed') {
+        clearInterval(this.poller);
+        const result = await fetch('/api/result/{{ job_id }}').then(r => r.json());
+        this.transcriptBn = result.transcript_bn;
+        this.transcriptEn = result.transcript_en;
+      } else if (this.status === 'failed') {
+        clearInterval(this.poller);
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

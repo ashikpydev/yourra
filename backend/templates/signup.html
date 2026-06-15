@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}YourRA Sign up{% endblock %}
+{% block content %}
+<section class="container-page py-16 flex justify-center">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-extrabold">Create your account</h1>
+      <p class="muted text-sm mt-1">Sign up with your email to get started.</p>
+    </div>
+    <div class="card card-pad" x-data="{ loading: false, error: '', success: '' }">
+      <form @submit.prevent="
+        loading = true; error = ''; success = '';
+        fetch('/signup', { method: 'POST', body: new FormData($el) })
+          .then(async r => {
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.detail || 'Signup failed');
+            success = data.message;
+          })
+          .catch(e => error = e.message)
+          .finally(() => loading = false)
+      ">
+        <label class="label">Email</label>
+        <input type="email" name="email" required class="field mb-4">
+        <label class="label">Password</label>
+        <input type="password" name="password" required minlength="6" class="field mb-1">
+        <p class="text-xs muted mb-5">At least 6 characters.</p>
+        <button type="submit" :disabled="loading" class="btn btn-primary w-full">
+          <span x-show="!loading">Sign up</span>
+          <span x-show="loading">Creating account…</span>
+        </button>
+        <p x-show="error" x-text="error" class="text-rose-600 text-sm mt-3"></p>
+        <template x-if="success">
+          <div class="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm">
+            <span x-text="success"></span>
+            <div class="mt-2">Once verified, <a href="/login" class="font-semibold underline">log in here</a>.</div>
+          </div>
+        </template>
+      </form>
+    </div>
+    <p class="text-center text-sm muted mt-5">
+      Already have an account? <a href="/login" class="text-indigo-600 font-medium">Log in</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

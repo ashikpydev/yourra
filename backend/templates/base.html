@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}YourRA Bangla Transcription{% endblock %}</title>
+  <meta name="description" content="Fast, accurate Bangla transcription with English translation for qualitative research.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Noto+Sans+Bengali:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen flex flex-col">
+  <header class="site-nav sticky top-0 z-40 border-b border-slate-200">
+    <nav class="container-page flex items-center justify-between h-16" x-data="{ open: false }">
+      <a href="/" class="brand-mark">
+        <span class="brand-logo">Y</span>
+        <span>Your<span class="accent">RA</span></span>
+      </a>
+
+      <div class="hidden md:flex items-center gap-7">
+        <a href="/#how" class="nav-link">How it works</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        {% if user %}
+          <a href="/dashboard" class="nav-link">Dashboard</a>
+          <form action="/logout" method="post"><button type="submit" class="btn btn-secondary btn-sm">Log out</button></form>
+        {% else %}
+          <a href="/login" class="nav-link">Login</a>
+          <a href="/signup" class="btn btn-primary btn-sm">Start free</a>
+        {% endif %}
+      </div>
+
+      <button class="md:hidden text-slate-700" @click="open = !open" aria-label="Menu">
+        <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <div x-show="open" x-cloak @click.outside="open=false"
+           class="absolute top-16 left-0 right-0 bg-white border-b border-slate-200 md:hidden px-5 py-4 flex flex-col gap-3 shadow-lg">
+        <a href="/#how" class="nav-link">How it works</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        {% if user %}
+          <a href="/dashboard" class="nav-link">Dashboard</a>
+          <form action="/logout" method="post"><button type="submit" class="btn btn-secondary btn-sm w-full">Log out</button></form>
+        {% else %}
+          <a href="/login" class="nav-link">Login</a>
+          <a href="/signup" class="btn btn-primary btn-sm">Start free</a>
+        {% endif %}
+      </div>
+    </nav>
+  </header>
+
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer mt-20">
+    <div class="container-page py-12 grid gap-8 md:grid-cols-3">
+      <div class="md:col-span-1">
+        <div class="brand-mark" style="color:#fff">
+          <span class="brand-logo">Y</span><span>Your<span style="color:var(--brand-300)">RA</span></span>
+        </div>
+        <p class="text-sm text-slate-400 mt-3 max-w-sm">
+          Fast, accurate Bangla transcription with English translation for qualitative research.
+        </p>
+      </div>
+      <div>
+        <div class="text-sm font-semibold text-white mb-3">Product</div>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="text-sm font-semibold text-white mb-3">Get started</div>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/signup">Create an account</a></li>
+          <li><a href="/login">Log in</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-slate-700">
+      <div class="container-page py-5 text-xs text-slate-400">
+        <span>&copy; 2026 YourRA. Bangla and English transcription for qualitative research.</span>
+      </div>
+    </div>
+  </footer>
+  <style>[x-cloak]{display:none!important}</style>
+</body>
+</html>
