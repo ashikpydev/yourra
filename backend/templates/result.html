@@ -70,6 +70,7 @@ function resultPage() {
     transcriptBn: {{ (job.transcript_bn if job else '') | tojson }},
     transcriptEn: {{ (job.transcript_en if job else '') | tojson }},
     elapsed: 0,
+    createdAt: "{{ job.created_at if job else '' }}",
     poller: null,
     ticker: null,
 
@@ -85,7 +86,10 @@ function resultPage() {
       return 'Queued';
     },
     elapsedText() {
-      const m = Math.floor(this.elapsed / 60), s = this.elapsed % 60;
+      let secs = this.elapsed;
+      const start = Date.parse(this.createdAt);  // real submission time (UTC)
+      if (!isNaN(start)) secs = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      const m = Math.floor(secs / 60), s = secs % 60;
       return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
     },
 
