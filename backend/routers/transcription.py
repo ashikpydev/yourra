@@ -113,6 +113,7 @@ async def upload_audio(
     queued = jobs.enqueue_transcription(
         job_id, user["_auth_user_id"], r2_key, model_name, user["credits_minutes"]
     )
+    print(f"[upload] job {job_id} created; queued_to_redis={queued}", flush=True)
     if not queued:
         background_tasks.add_task(
             run_transcription_job, job_id, user["_auth_user_id"], r2_key, model_name,

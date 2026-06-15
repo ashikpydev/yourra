@@ -36,6 +36,7 @@ def run_job_sync(job_id: str, user_id: str, r2_key: str, model_name: str, max_mi
 
 async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_name: str,
                                 max_minutes: int | None = None):
+    print(f"[pipeline] job {job_id} STARTING (model={model_name}, max_minutes={max_minutes})", flush=True)
     job_dir = os.path.join(settings.TMP_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
 
@@ -47,6 +48,7 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
 
         # 1. Download original from R2
         storage.download_to_path(r2_key, local_input)
+        print(f"[pipeline] job {job_id} downloaded audio", flush=True)
 
         # 2. Determine duration + chunk.
         # Cap processing to the user's available minutes (max_minutes) so a
@@ -67,6 +69,7 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
             offsets.append(running)
             running += chunking.get_audio_duration_seconds(cp)
 
+        print(f"[pipeline] job {job_id} split into {total_chunks} chunk(s); starting transcription", flush=True)
         _update_job(job_id, chunk_count=total_chunks, status="processing", progress_pct=15)
 
         # 3. Transcribe each chunk fully, in order, updating progress per chunk
@@ -79,6 +82,7 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
         transcript_bn, transcript_en = await gemini.transcribe_all_chunks(
             chunk_paths, model_name, offsets=offsets, progress_cb=_progress
         )
+        print(f"[pipeline] job {job_id} transcription done ({len(transcript_bn)} bn chars)", flush=True)
 
         _update_job(job_id, status="merging", progress_pct=97)
 
@@ -124,6 +128,7 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
             transcript_en=transcript_en,
             completed_at=datetime.now(timezone.utc).isoformat(),
         )
+        print(f"[pipeline] job {job_id} COMPLETED", flush=True)
 
         # Free the stored audio now that the transcript is saved — keeps R2
         # storage near zero so you stay well within the free tier. (The
@@ -134,6 +139,8 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
             pass
 
     except Exception as e:
+        print(f"[pipeline] job {job_id} FAILED: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
         _update_job(
             job_id,
             status="failed",
