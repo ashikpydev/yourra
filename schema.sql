@@ -11,11 +11,26 @@ create table if not exists user_profiles (
   trial_used boolean default false,
   trial_ip text,
   is_active integer default 1,       -- 1 = active, 0 = paused (set from admin panel)
+  full_name text,
+  organization text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 -- If upgrading an existing project, also run:
 -- alter table user_profiles add column if not exists is_active integer default 1;
+-- alter table user_profiles add column if not exists full_name text;
+-- alter table user_profiles add column if not exists organization text;
+
+-- Trial requests (public "Request a trial" form)
+create table if not exists trial_requests (
+  id uuid default gen_random_uuid() primary key,
+  full_name text,
+  email text,
+  organization text,
+  purpose text,
+  status text default 'new',
+  created_at timestamptz default now()
+);
 
 create table if not exists transcription_jobs (
   id uuid default gen_random_uuid() primary key,

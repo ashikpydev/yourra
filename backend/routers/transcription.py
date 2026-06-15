@@ -86,14 +86,9 @@ async def upload_audio(
     # Stream to R2
     storage.upload_fileobj(io.BytesIO(contents), r2_key, content_type=audio.content_type)
 
-    # Determine model based on whether this is a trial user
+    # Always use the best model (Gemini Pro) for every job.
     model_name = settings.GEMINI_MODEL_PRO
-    if not user["trial_used"] or user["credits_minutes"] <= settings.TRIAL_MINUTES:
-        # Heuristic: trial users (low/initial balance from trial) get Flash.
-        # Paid users (topped up) get Pro. Refine with a dedicated "plan" field
-        # if you want stricter control.
-        model_name = settings.GEMINI_MODEL_FLASH
-    model_key = "flash" if model_name == settings.GEMINI_MODEL_FLASH else "pro"
+    model_key = "pro"
 
     job = (
         supabase_admin.table("transcription_jobs")

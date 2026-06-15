@@ -19,11 +19,19 @@
           .catch(e => error = e.message)
           .finally(() => loading = false)
       ">
+        <label class="label">Full name</label>
+        <input type="text" name="full_name" required class="field mb-4">
+
+        <label class="label">Organization <span class="muted font-normal">(optional)</span></label>
+        <input type="text" name="organization" class="field mb-4">
+
         <label class="label">Email</label>
         <input type="email" name="email" required class="field mb-4">
+
         <label class="label">Password</label>
         <input type="password" name="password" required minlength="6" class="field mb-1">
         <p class="text-xs muted mb-5">At least 6 characters.</p>
+
         <button type="submit" :disabled="loading" class="btn btn-primary w-full">
           <span x-show="!loading">Sign up</span>
           <span x-show="loading">Creating account…</span>
@@ -32,7 +40,7 @@
         <template x-if="success">
           <div class="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm">
             <span x-text="success"></span>
-            <div class="mt-2">Once verified, <a href="/login" class="font-semibold underline">log in here</a>.</div>
+            <div class="mt-2"><a href="/login" class="font-semibold underline">Log in here</a></div>
           </div>
         </template>
       </form>

@@ -247,6 +247,17 @@ async def admin_requests(request: Request):
     return templates.TemplateResponse("admin/requests.html", {"request": request, "requests": requests_.data})
 
 
+@router.get("/trials")
+async def admin_trials(request: Request):
+    rows = (
+        supabase_admin.table("trial_requests")
+        .select("*")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return templates.TemplateResponse("admin/trials.html", {"request": request, "trials": rows.data})
+
+
 @router.post("/requests/{request_id}/update")
 async def update_request(request_id: str, status: str = Form(...), quoted_price: str = Form(""), admin_notes: str = Form("")):
     supabase_admin.table("service_requests").update(

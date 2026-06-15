@@ -1,16 +1,8 @@
 """
 Auth routes: signup, login, logout.
-
-Supabase handles password hashing, email verification emails, and session
-tokens. This router is a thin wrapper that:
-- Blocks disposable emails at signup
-- Stores the resulting access token in an httpOnly cookie
-- On first login, triggers the free-trial check (handled lazily in
-  get_current_user / the dashboard, since trial eligibility also depends
-  on the client's IP which is only known per-request)
 """
 from fastapi import APIRouter, Request, Response, Form, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 
 from backend.config import settings
 from backend.database import supabase_admin
@@ -22,7 +14,12 @@ COOKIE_NAME = "sb_access_token"
 
 
 @router.post("/signup")
-async def signup(request: Request, email: str = Form(...), password: str = Form(...)):
+async def signup(
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(""),
+    organization: str = Form(""),
+):
     if await is_disposable_email(email):
         raise HTTPException(status_code=400, detail="Please use a permanent email address.")
 
@@ -34,47 +31,55 @@ async def signup(request: Request, email: str = Form(...), password: str = Form(
     if result.user is None:
         raise HTTPException(status_code=400, detail="Signup failed. Please try again.")
 
-    # Supabase sends a verification email automatically (if enabled in
-    # project settings). The user_profiles row is created lazily on first
-    # authenticated request (see backend/auth.py).
+    # Create the profile now so we can store the name / organization.
+    uid = result.user.id
+    try:
+        existing = supabase_admin.table("user_profiles").select("id").eq("id", uid).execute()
+        if not existing.data:
+            supabase_admin.table("user_profiles").insert({
+                "id": uid,
+                "email": email.strip().lower(),
+                "full_name": full_name.strip() or None,
+                "organization": organization.strip() or None,
+                "credits_minutes": 0,
+                "trial_used": True,
+                "is_active": 1,
+            }).execute()
+    except Exception:
+        pass
+
     if settings.LOCAL_MODE:
         return {"message": "Account created. You can log in now."}
-    return {"message": "Account created. Please check your email to verify your account."}
+    return {"message": "Account created. Please check your email to verify your account, then log in."}
 
 
 @router.post("/login")
-async def login(request: Request, response: Response, email: str = Form(...), password: str = Form(...)):
+async def login(email: str = Form(...), password: str = Form(...)):
     try:
         result = supabase_admin.auth.sign_in_with_password({"email": email, "password": password})
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
+        raise HTTPException(status_code=401, detail="Wrong email or password.")
 
     if not result.session:
-        raise HTTPException(status_code=401, detail="Invalid email or password, or email not verified.")
+        raise HTTPException(status_code=401, detail="Wrong email or password, or email not verified.")
 
     access_token = result.session.access_token
     user_id = result.user.id
 
-    # Ensure profile exists. New accounts start with 0 credits — access is
-    # granted by an admin from the panel (no automatic free trial).
     existing = supabase_admin.table("user_profiles").select("*").eq("id", user_id).execute()
     if not existing.data:
         supabase_admin.table("user_profiles").insert(
-            {"id": user_id, "email": email, "credits_minutes": 0, "trial_used": True}
+            {"id": user_id, "email": email, "credits_minutes": 0, "trial_used": True, "is_active": 1}
         ).execute()
     elif existing.data[0].get("is_active") == 0:
         raise HTTPException(status_code=403, detail="Your account is paused. Please contact support.")
 
-    redirect = RedirectResponse(url="/dashboard", status_code=303)
-    redirect.set_cookie(
-        key=COOKIE_NAME,
-        value=access_token,
-        httponly=True,
-        secure=settings.COOKIE_SECURE,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7,
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie(
+        key=COOKIE_NAME, value=access_token, httponly=True,
+        secure=settings.COOKIE_SECURE, samesite="lax", max_age=604800,
     )
-    return redirect
+    return resp
 
 
 @router.post("/logout")

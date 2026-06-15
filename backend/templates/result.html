@@ -13,16 +13,31 @@
         <h1 class="text-xl font-extrabold">{{ job.original_filename }}</h1>
         <p class="text-sm muted mt-1">Submitted {{ job.created_at }}</p>
       </div>
-      <span class="badge" :class="badgeClass(status)"><span class="dot"></span><span x-text="status"></span></span>
+      <span class="badge" :class="badgeClass(status)"><span class="dot"></span><span x-text="stageLabel()"></span></span>
     </div>
 
+    <!-- In-progress panel -->
     <div class="mt-5" x-show="status !== 'completed' && status !== 'failed'">
-      <div class="track"><span :style="`width:${progress}%`"></span></div>
-      <p class="text-sm muted mt-2">Processing. This page updates automatically every few seconds.</p>
+      <div class="track"><span :style="`width:${Math.max(progress,3)}%`"></span></div>
+      <div class="flex justify-between items-center mt-2 text-sm">
+        <span class="font-medium" x-text="stageLabel() + (progress ? ' · ' + progress + '%' : '')"></span>
+        <span class="muted">Elapsed <span x-text="elapsedText()"></span></span>
+      </div>
+      <div class="mt-4 rounded-xl bg-indigo-50 text-indigo-800 text-sm px-4 py-3">
+        <p>Your audio is being transcribed with Gemini Pro. As a rough guide it takes about
+           <strong>1 minute of processing per 3–4 minutes of audio</strong>.</p>
+        <p class="mt-1">You can safely leave this page — the job keeps running and you'll find the
+           finished transcript on your dashboard.</p>
+      </div>
     </div>
 
-    <div x-show="status === 'failed'" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm px-4 py-3" x-text="errorMessage || 'Transcription failed. Please try again or contact support.'"></div>
+    <!-- Failed -->
+    <div x-show="status === 'failed'" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm px-4 py-3">
+      <p class="font-semibold mb-1">This transcription didn't finish.</p>
+      <p x-text="errorMessage || 'Please try uploading again, or contact support.'"></p>
+    </div>
 
+    <!-- Completed: downloads -->
     <div x-show="status === 'completed'" class="mt-5 flex gap-3 flex-wrap items-center">
       <a :href="'/api/download/{{ job_id }}/docx'" class="btn btn-primary btn-sm">⬇ Word report (.docx)</a>
       <span class="text-xs muted">ready to hand over, with the demographic table</span>
@@ -54,21 +69,32 @@ function resultPage() {
     errorMessage: {{ (job.error_message if job else '') | tojson }},
     transcriptBn: {{ (job.transcript_bn if job else '') | tojson }},
     transcriptEn: {{ (job.transcript_en if job else '') | tojson }},
+    elapsed: 0,
     poller: null,
+    ticker: null,
 
-    badgeClass(status) {
-      return {
-        completed: 'badge-green', failed: 'badge-rose', pending: 'badge-gray',
-        processing: 'badge-amber', merging: 'badge-amber',
-      }[status] || 'badge-gray';
+    badgeClass(s) {
+      return { completed:'badge-green', failed:'badge-rose', pending:'badge-gray',
+               processing:'badge-amber', merging:'badge-amber' }[s] || 'badge-gray';
+    },
+    stageLabel() {
+      if (this.status === 'completed') return 'Completed';
+      if (this.status === 'failed') return 'Failed';
+      if (this.status === 'merging') return 'Finalizing';
+      if (this.status === 'processing') return 'Transcribing';
+      return 'Queued';
+    },
+    elapsedText() {
+      const m = Math.floor(this.elapsed / 60), s = this.elapsed % 60;
+      return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
     },
 
     init() {
       if (this.status && this.status !== 'completed' && this.status !== 'failed') {
+        this.ticker = setInterval(() => this.elapsed++, 1000);
         this.poller = setInterval(() => this.poll(), 5000);
       }
     },
-
     async poll() {
       const res = await fetch('/api/status/{{ job_id }}');
       const data = await res.json();
@@ -76,12 +102,12 @@ function resultPage() {
       this.progress = data.progress_pct;
       this.errorMessage = data.error_message;
       if (this.status === 'completed') {
-        clearInterval(this.poller);
-        const result = await fetch('/api/result/{{ job_id }}').then(r => r.json());
-        this.transcriptBn = result.transcript_bn;
-        this.transcriptEn = result.transcript_en;
+        clearInterval(this.poller); clearInterval(this.ticker);
+        const r = await fetch('/api/result/{{ job_id }}').then(x => x.json());
+        this.transcriptBn = r.transcript_bn;
+        this.transcriptEn = r.transcript_en;
       } else if (this.status === 'failed') {
-        clearInterval(this.poller);
+        clearInterval(this.poller); clearInterval(this.ticker);
       }
     },
   };

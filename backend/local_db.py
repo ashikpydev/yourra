@@ -59,7 +59,11 @@ _DDL = [
     """create table if not exists user_profiles (
         id text primary key, email text unique, credits_minutes integer default 0,
         trial_used integer default 0, trial_ip text, is_active integer default 1,
+        full_name text, organization text,
         created_at text, updated_at text)""",
+    """create table if not exists trial_requests (
+        id text primary key, full_name text, email text, organization text,
+        purpose text, status text default 'new', created_at text)""",
     """create table if not exists transcription_jobs (
         id text primary key, user_id text, status text default 'pending',
         progress_pct integer default 0, original_filename text, audio_r2_key text,
@@ -311,6 +315,8 @@ class LocalDB:
             for table, col, typ in [
                 ("transcription_jobs", "respondent_meta", "text"),
                 ("user_profiles", "is_active", "integer default 1"),
+                ("user_profiles", "full_name", "text"),
+                ("user_profiles", "organization", "text"),
             ]:
                 try:
                     self.conn.execute(f"alter table {table} add column {col} {typ}")

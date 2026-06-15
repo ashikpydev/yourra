@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}YourRA Trial Request{% endblock %}
+{% block content %}
+<section class="container-page py-16 flex justify-center">
+  <div class="w-full max-w-lg">
+    <div class="text-center mb-6">
+      <span class="eyebrow">Try it first</span>
+      <h1 class="text-3xl font-extrabold mt-3">Request a trial</h1>
+      <p class="muted mt-2">Tell us a little about you and your research. We'll review your request and grant you some free minutes to try YourRA.</p>
+    </div>
+
+    {% if request.query_params.get('submitted') %}
+    <div class="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-3 text-center text-sm">
+      ✓ Thanks! We've received your request and will get back to you shortly.
+    </div>
+    {% endif %}
+
+    <div class="card card-pad">
+      <form action="/trial/request" method="post" class="space-y-4">
+        <div>
+          <label class="label">Full name</label>
+          <input type="text" name="full_name" required class="field">
+        </div>
+        <div>
+          <label class="label">Email</label>
+          <input type="email" name="email" required class="field">
+        </div>
+        <div>
+          <label class="label">Organization <span class="muted font-normal">(optional)</span></label>
+          <input type="text" name="organization" class="field">
+        </div>
+        <div>
+          <label class="label">What will you use it for?</label>
+          <textarea name="purpose" rows="3" class="field" placeholder="e.g. transcribing IDIs and FGDs for a research project"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Request trial</button>
+      </form>
+    </div>
+    <p class="text-center text-sm muted mt-5">Already have access? <a href="/login" class="text-indigo-600 font-medium">Log in</a></p>
+  </div>
+</section>
+{% endblock %}

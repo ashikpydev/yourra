@@ -16,7 +16,7 @@
         <span class="brand-logo">Y</span><span>Your<span style="color:var(--brand-300)">RA</span></span>
       </span>
       <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-4">Admin</span>
-      {% set nav = [('/admin','Dashboard'), ('/admin/users','Users'), ('/admin/payments','Payments'), ('/admin/jobs','Jobs'), ('/admin/requests','Service Requests')] %}
+      {% set nav = [('/admin','Dashboard'), ('/admin/users','Users'), ('/admin/payments','Payments'), ('/admin/jobs','Jobs'), ('/admin/trials','Trial Requests')] %}
       {% for href, label in nav %}
       <a href="{{ href }}" class="px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/10 hover:text-white whitespace-nowrap {% if request.url.path == href %}bg-white/10 text-white{% endif %}">{{ label }}</a>
       {% endfor %}

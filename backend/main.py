@@ -149,6 +149,31 @@ async def submit_service_request(
     return RedirectResponse(url="/services?submitted=1", status_code=303)
 
 
+@app.get("/trial", response_class=HTMLResponse)
+async def trial_page(request: Request):
+    user = await get_optional_user(request)
+    return templates.TemplateResponse("trial.html", {"request": request, "user": user})
+
+
+@app.post("/trial/request")
+async def submit_trial_request(
+    full_name: str = Form(...),
+    email: str = Form(...),
+    organization: str = Form(""),
+    purpose: str = Form(""),
+):
+    supabase_admin.table("trial_requests").insert(
+        {
+            "full_name": full_name,
+            "email": email.strip().lower(),
+            "organization": organization or None,
+            "purpose": purpose or None,
+            "status": "new",
+        }
+    ).execute()
+    return RedirectResponse(url="/trial?submitted=1", status_code=303)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
