@@ -64,48 +64,43 @@
     <p x-show="audioError" class="text-xs text-rose-600 mt-2">Audio couldn't be loaded — it may have been removed after the {{ retention_days }}-day review window, or this job was created before audio review was enabled. Re-upload to use playback.</p>
   </div>
 
-  <!-- Edit toolbar -->
-  <div x-show="status === 'completed'" class="flex items-center flex-wrap gap-3 mb-3">
-    <button x-show="!editing" @click="startEdit()" class="btn btn-secondary btn-sm">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-      Edit transcript
-    </button>
-    <span x-show="!editing" class="text-xs muted">Fix any errors, then download the clean Word report (no timestamps).</span>
-    <template x-if="editing">
-      <span class="flex items-center flex-wrap gap-2">
-        <button @click="saveEdits()" :disabled="saving" class="btn btn-primary btn-sm" x-text="saving ? 'Saving…' : 'Save changes'"></button>
-        <button @click="cancelEdit()" :disabled="saving" class="btn btn-ghost btn-sm">Cancel</button>
-        <span x-show="saved" class="text-xs text-emerald-700">Saved ✓</span>
-        <span class="text-xs muted">Editing — keep the [time] tags at the start of each line if you want click-to-play to keep working.</span>
-      </span>
-    </template>
+  <!-- Edit hint -->
+  <div x-show="status === 'completed'" class="flex items-center flex-wrap gap-2 mb-3 text-xs muted">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-indigo-600 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    <span>Click a <strong>timestamp</strong> to play from there. Click any <strong>line</strong> to fix it right in place. The downloaded Word report stays clean (no timestamps).</span>
   </div>
 
   <div x-show="status === 'completed'" class="grid md:grid-cols-2 gap-6">
     <div class="card card-pad">
       <h2 class="font-display font-bold mb-3">Bangla verbatim</h2>
-      <div class="transcript bn-text" x-show="!editing">
-        <template x-for="(ln, i) in bnLines" :key="i">
-          <div class="tline" :class="{ 'tline-active': isActive(bnLines, i), 'tline-plain': ln.t === null }" @click="seek(ln.t)">
-            <span class="tline-ts" x-show="ln.t !== null" x-text="ln.ts"></span>
-            <span><span class="tline-spk" x-show="ln.label" x-text="ln.label + ': '"></span><span x-text="ln.body"></span></span>
+      <div class="transcript bn-text">
+        <template x-for="(ln, i) in bn" :key="i">
+          <div class="tline" :class="{ 'tline-active': isActive(ln) }">
+            <span class="tline-ts" x-show="ln.t !== null" x-text="ln.tsDisp" @click="seek(ln.t)" title="Play from here"></span>
+            <span class="tline-edit"><span class="tline-spk" x-show="ln.label !== ''" contenteditable="true" spellcheck="false" x-init="$el.innerText = ln.label" @input="ln.label = $event.target.innerText; dirty = true"></span><span x-show="ln.label !== ''">:&nbsp;</span><span class="tline-body" contenteditable="true" x-init="$el.innerText = ln.body" @input="ln.body = $event.target.innerText; dirty = true"></span></span>
           </div>
         </template>
       </div>
-      <textarea x-show="editing" x-model="editBn" class="field bn-text" style="height:480px;line-height:1.8"></textarea>
     </div>
     <div class="card card-pad">
       <h2 class="font-display font-bold mb-3">English translation</h2>
-      <div class="transcript" x-show="!editing">
-        <template x-for="(ln, i) in enLines" :key="i">
-          <div class="tline" :class="{ 'tline-active': isActive(enLines, i), 'tline-plain': ln.t === null }" @click="seek(ln.t)">
-            <span class="tline-ts" x-show="ln.t !== null" x-text="ln.ts"></span>
-            <span><span class="tline-spk" x-show="ln.label" x-text="ln.label + ': '"></span><span x-text="ln.body"></span></span>
+      <div class="transcript">
+        <template x-for="(ln, i) in en" :key="i">
+          <div class="tline" :class="{ 'tline-active': isActive(ln) }">
+            <span class="tline-ts" x-show="ln.t !== null" x-text="ln.tsDisp" @click="seek(ln.t)" title="Play from here"></span>
+            <span class="tline-edit"><span class="tline-spk" x-show="ln.label !== ''" contenteditable="true" spellcheck="false" x-init="$el.innerText = ln.label" @input="ln.label = $event.target.innerText; dirty = true"></span><span x-show="ln.label !== ''">:&nbsp;</span><span class="tline-body" contenteditable="true" x-init="$el.innerText = ln.body" @input="ln.body = $event.target.innerText; dirty = true"></span></span>
           </div>
         </template>
       </div>
-      <textarea x-show="editing" x-model="editEn" class="field" style="height:480px;line-height:1.8"></textarea>
     </div>
+  </div>
+
+  <!-- Floating save bar (only when there are unsaved edits) -->
+  <div x-show="status === 'completed' && (dirty || saving || justSaved)" x-cloak class="save-bar">
+    <span x-show="dirty && !saving" class="text-sm">You have unsaved edits</span>
+    <span x-show="saving" class="text-sm">Saving…</span>
+    <span x-show="justSaved && !dirty && !saving" class="text-sm">All changes saved ✓</span>
+    <button @click="saveEdits()" :disabled="saving || !dirty" class="btn btn-primary btn-sm">Save changes</button>
   </div>
   {% endif %}
 </section>
@@ -125,62 +120,36 @@ function resultPage() {
     createdAt: "{{ job.created_at if job else '' }}",
     poller: null,
     ticker: null,
-    editing: false,
+    bn: [],
+    en: [],
+    dirty: false,
     saving: false,
-    saved: false,
-    editBn: '',
-    editEn: '',
-
-    startEdit() {
-      this.editBn = this.transcriptBn || '';
-      this.editEn = this.transcriptEn || '';
-      this.saved = false;
-      this.editing = true;
-      const p = this.$refs.player; if (p) p.pause();
-    },
-    cancelEdit() { this.editing = false; },
-    async saveEdits() {
-      this.saving = true;
-      try {
-        const form = new FormData();
-        form.append('transcript_bn', this.editBn);
-        form.append('transcript_en', this.editEn);
-        const res = await fetch('/api/transcript/{{ job_id }}', { method: 'POST', body: form });
-        if (!res.ok) throw new Error('save failed');
-        this.transcriptBn = this.editBn;
-        this.transcriptEn = this.editEn;
-        this.editing = false;
-        this.saved = true;
-      } catch (e) {
-        alert('Could not save your changes. Please try again.');
-      } finally {
-        this.saving = false;
-      }
-    },
-
-    get bnLines() { return this.parseLines(this.transcriptBn); },
-    get enLines() { return this.parseLines(this.transcriptEn); },
+    justSaved: false,
 
     parseLines(text) {
       const out = [];
       (text || '').split('\n').forEach(raw => {
         const line = raw.trim();
         if (!line) return;
-        let t = null, rest = line;
-        const m = line.match(/^\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]\s*(.*)$/);
+        let t = null, tsTag = null, rest = line;
+        const m = line.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$/);
         if (m) {
-          const hasH = m[3] !== undefined;
-          const h = hasH ? parseInt(m[1]) : 0;
-          const mm = hasH ? parseInt(m[2]) : parseInt(m[1]);
-          const ss = hasH ? parseInt(m[3]) : parseInt(m[2]);
-          t = h * 3600 + mm * 60 + ss;
-          rest = m[4];
+          tsTag = m[1];
+          const p = tsTag.split(':').map(n => parseInt(n));
+          t = p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1];
+          rest = m[2];
         }
         let label = '', body = rest;
         const ci = rest.indexOf(':');
-        if (ci > -1 && ci <= 24) { label = rest.slice(0, ci); body = rest.slice(ci + 1).trim(); }
-        out.push({ t, label, body, ts: t === null ? '' : this.fmt(t) });
+        if (ci > -1 && ci <= 24) { label = rest.slice(0, ci).trim(); body = rest.slice(ci + 1).trim(); }
+        out.push({ t, tsTag, tsDisp: t === null ? '' : this.fmt(t), tEnd: Infinity, label, body });
       });
+      for (let i = 0; i < out.length; i++) {
+        if (out[i].t === null) continue;
+        let next = Infinity;
+        for (let j = i + 1; j < out.length; j++) { if (out[j].t !== null) { next = out[j].t; break; } }
+        out[i].tEnd = next;
+      }
       return out;
     },
     fmt(t) {
@@ -188,6 +157,7 @@ function resultPage() {
       const mm = (m < 10 && h > 0 ? '0' : '') + m, ss = (s < 10 ? '0' : '') + s;
       return (h > 0 ? h + ':' : '') + mm + ':' + ss;
     },
+    isActive(ln) { return ln.t !== null && this.cur >= ln.t && this.cur < ln.tEnd; },
     seek(t) {
       if (t === null) return;
       const p = this.$refs.player;
@@ -195,12 +165,30 @@ function resultPage() {
       p.currentTime = t;
       p.play().catch(() => {});
     },
-    isActive(list, i) {
-      const t = list[i].t;
-      if (t === null) return false;
-      let next = Infinity;
-      for (let j = i + 1; j < list.length; j++) { if (list[j].t !== null) { next = list[j].t; break; } }
-      return this.cur >= t && this.cur < next;
+    buildText(lines) {
+      return lines.map(ln => {
+        const tag = ln.tsTag ? '[' + ln.tsTag + '] ' : '';
+        const lbl = ln.label ? ln.label + ': ' : '';
+        return tag + lbl + (ln.body || '');
+      }).join('\n');
+    },
+    async saveEdits() {
+      this.saving = true;
+      try {
+        const form = new FormData();
+        form.append('transcript_bn', this.buildText(this.bn));
+        form.append('transcript_en', this.buildText(this.en));
+        const res = await fetch('/api/transcript/{{ job_id }}', { method: 'POST', body: form });
+        if (!res.ok) throw new Error('save failed');
+        this.transcriptBn = this.buildText(this.bn);
+        this.transcriptEn = this.buildText(this.en);
+        this.dirty = false;
+        this.justSaved = true;
+      } catch (e) {
+        alert('Could not save your changes. Please try again.');
+      } finally {
+        this.saving = false;
+      }
     },
 
     badgeClass(s) {
@@ -222,11 +210,20 @@ function resultPage() {
       return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
     },
 
+    loadTranscripts() {
+      this.bn = this.parseLines(this.transcriptBn);
+      this.en = this.parseLines(this.transcriptEn);
+    },
     init() {
-      if (this.status && this.status !== 'completed' && this.status !== 'failed') {
+      if (this.status === 'completed') {
+        this.loadTranscripts();
+      } else if (this.status && this.status !== 'failed') {
         this.ticker = setInterval(() => this.elapsed++, 1000);
         this.poller = setInterval(() => this.poll(), 5000);
       }
+      window.addEventListener('beforeunload', (e) => {
+        if (this.dirty) { e.preventDefault(); e.returnValue = ''; }
+      });
     },
     async poll() {
       const res = await fetch('/api/status/{{ job_id }}');
@@ -239,6 +236,7 @@ function resultPage() {
         const r = await fetch('/api/result/{{ job_id }}').then(x => x.json());
         this.transcriptBn = r.transcript_bn;
         this.transcriptEn = r.transcript_en;
+        this.loadTranscripts();
       } else if (this.status === 'failed') {
         clearInterval(this.poller); clearInterval(this.ticker);
       }

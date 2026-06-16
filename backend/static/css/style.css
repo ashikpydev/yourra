@@ -177,20 +177,35 @@ h1, h2, h3, h4, .font-display {
   max-height: 520px; overflow-y: auto;
 }
 
-/* ---------- Click-to-play transcript lines ---------- */
+/* ---------- Click-to-play + inline-editable transcript lines ---------- */
 .tline {
-  display: flex; gap: .6rem; padding: .25rem .4rem; border-radius: 8px;
-  cursor: pointer; transition: background .12s ease;
+  display: flex; gap: .6rem; padding: .3rem .4rem; border-radius: 8px;
+  transition: background .12s ease;
 }
-.tline:hover { background: var(--brand-50); }
 .tline-active { background: #fef9c3; }
-.tline-plain { cursor: default; }
-.tline-plain:hover { background: transparent; }
 .tline-ts {
-  color: var(--brand-600); font-size: .78rem; flex-shrink: 0; min-width: 56px;
-  font-variant-numeric: tabular-nums; user-select: none;
+  color: var(--brand-600); font-size: .78rem; flex-shrink: 0; min-width: 54px;
+  font-variant-numeric: tabular-nums; user-select: none; cursor: pointer; padding-top: 2px;
 }
+.tline-ts:hover { text-decoration: underline; }
+.tline-edit { flex: 1; }
 .tline-spk { font-weight: 700; }
+/* editable regions: subtle affordance, clear focus */
+.tline-spk[contenteditable], .tline-body[contenteditable] {
+  outline: none; border-radius: 4px; padding: 0 2px; transition: box-shadow .1s ease, background .1s ease;
+}
+.tline-body[contenteditable]:hover { background: rgba(99,102,241,.07); }
+.tline-spk[contenteditable]:focus, .tline-body[contenteditable]:focus {
+  background: #fff; box-shadow: 0 0 0 2px var(--brand-300);
+}
+
+/* ---------- Floating save bar ---------- */
+.save-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 70;
+  display: flex; align-items: center; gap: .8rem;
+  background: var(--ink-900); color: #fff; padding: .6rem .7rem .6rem 1.1rem;
+  border-radius: 999px; box-shadow: var(--shadow-lg);
+}
 
 /* ---------- Footer ---------- */
 .site-footer { background: var(--ink-900); color: #cbd5e1; }
