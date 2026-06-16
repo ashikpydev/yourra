@@ -4,6 +4,7 @@ manual bKash top-up submission.
 """
 import io
 import math
+import re
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -256,6 +257,9 @@ async def download_transcript(job_id: str, lang: str, user=Depends(get_current_u
             + "\n\n===== ENGLISH =====\n\n" + (row["transcript_en"] or "")
         )
         filename = "transcript_combined.txt"
+
+    # Unwrap ((confidence flags)) so downloads read cleanly.
+    content = re.sub(r"\(\((.+?)\)\)", r"\1", content)
 
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),

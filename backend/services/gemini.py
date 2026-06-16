@@ -49,6 +49,7 @@ Rules:
 - The MODERATOR is the person asking the questions and guiding the discussion. Label their lines "Moderator:". Label the people answering "Respondent 1:", "Respondent 2:", and so on. Use the SAME label for the same voice.
 - Put ONE speaker turn per line, and BEGIN EVERY line with an absolute timestamp in square brackets in [H:MM:SS] format marking when that turn is spoken, counting forward from {start_ts}. For example: "[{start_ts}] Moderator: ...". The timestamp must be as accurate as possible because it is used to play back the matching audio.
 - Keep natural spoken Bangla verbatim, including fillers, repetitions, and any English words spoken.
+- CONFIDENCE FLAGGING: when the audio is noisy, faint, or overlapping and you are NOT sure about a word or phrase, still write your best guess but wrap it in double parentheses like ((your best guess)) so a human can quickly find and verify it. Use [inaudible] only when nothing at all can be made out. Apply the SAME ((...)) flags in both the Bangla and the English versions.
 {continuity}
 Return your answer in EXACTLY this format and nothing else:
 BANGLA:
@@ -132,8 +133,8 @@ def _mock(chunk_paths, offsets):
     for i, _ in enumerate(chunk_paths, 1):
         base = offs[i - 1]
         ts1, ts2 = _fmt_ts(base), _fmt_ts(base + 6)
-        bn.append(f"[{ts1}] Moderator: [লোকাল মক — অংশ {i}] আপনার নাম কী?\n[{ts2}] Respondent 1: আমার নাম রিনা।")
-        en.append(f"[{ts1}] Moderator: [Local mock — part {i}] What is your name?\n[{ts2}] Respondent 1: My name is Rina.")
+        bn.append(f"[{ts1}] Moderator: [লোকাল মক — অংশ {i}] আপনার নাম কী?\n[{ts2}] Respondent 1: আমার নাম ((রিনা))।")
+        en.append(f"[{ts1}] Moderator: [Local mock — part {i}] What is your name?\n[{ts2}] Respondent 1: My name is ((Rina)).")
     return "\n\n".join(bn), "\n\n".join(en)
 
 

@@ -107,6 +107,9 @@ def _add_transcript(doc, text, bangla=False):
         m = _TS_LEAD.match(stripped)
         if m:
             stripped = m.group(2).strip()
+        # Remove the ((...)) confidence-flag wrappers, keeping the word inside,
+        # so the final document reads naturally (flags are a web-review aid only).
+        stripped = re.sub(r"\(\((.+?)\)\)", r"\1", stripped)
         if not stripped:
             continue
         # Speaker line: bold the label before the first colon
