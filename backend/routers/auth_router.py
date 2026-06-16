@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, Response, Form, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 
 from backend.config import settings
-from backend.database import supabase_admin
+from backend.database import supabase_admin, supabase_auth
 from backend.services.trial import is_disposable_email
 
 router = APIRouter(tags=["auth"])
@@ -24,7 +24,9 @@ async def signup(
         raise HTTPException(status_code=400, detail="Please use a permanent email address.")
 
     try:
-        result = supabase_admin.auth.sign_up({"email": email, "password": password})
+        # Auth client (not the service-role data client) so supabase_admin
+        # is never downgraded to this new user.
+        result = supabase_auth.auth.sign_up({"email": email, "password": password})
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -56,7 +58,8 @@ async def signup(
 @router.post("/login")
 async def login(email: str = Form(...), password: str = Form(...)):
     try:
-        result = supabase_admin.auth.sign_in_with_password({"email": email, "password": password})
+        # Auth client only — keep supabase_admin pinned to service_role.
+        result = supabase_auth.auth.sign_in_with_password({"email": email, "password": password})
     except Exception:
         raise HTTPException(status_code=401, detail="Wrong email or password.")
 

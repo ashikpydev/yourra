@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from backend.auth import require_admin
 from backend.config import settings
-from backend.database import supabase_admin
+from backend.database import supabase_admin, supabase_auth
 from backend.services import mailer
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -77,9 +77,11 @@ async def admin_add_user(email: str = Form(...), minutes: int = Form(0)):
     password = secrets.token_urlsafe(9)
     try:
         if settings.LOCAL_MODE:
-            result = supabase_admin.auth.sign_up({"email": email, "password": password})
+            result = supabase_auth.auth.sign_up({"email": email, "password": password})
         else:
             # Production: create an already-confirmed account (no verification email needed).
+            # admin.create_user uses the service-role admin endpoint and does NOT
+            # set a user session, so it's safe on supabase_admin.
             result = supabase_admin.auth.admin.create_user(
                 {"email": email, "password": password, "email_confirm": True}
             )

@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from backend.config import settings
-from backend.database import supabase_admin
+from backend.database import supabase_admin, supabase_auth
 
 basic_auth = HTTPBasic()
 
@@ -34,7 +34,9 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        user_resp = supabase_admin.auth.get_user(token)
+        # Verify on the dedicated auth client so the service-role data client
+        # (supabase_admin) is never re-authed/downgraded to this user.
+        user_resp = supabase_auth.auth.get_user(token)
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 

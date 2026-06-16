@@ -12,6 +12,8 @@ if settings.LOCAL_MODE:
     from backend.local_db import LocalDB
 
     supabase_admin = LocalDB()
+    # Locally the same shim handles auth + data; no RLS to worry about.
+    supabase_auth = supabase_admin
 
     def get_supabase_for_token(access_token: str):
         # RLS doesn't apply locally; the same client is used everywhere.
@@ -59,9 +61,20 @@ else:
     except Exception:
         pass
 
+    # PRIVILEGED data client — must stay service_role forever. NEVER call
+    # .auth.get_user()/sign_in() on this client: doing so re-auths the shared
+    # client as that user and silently drops service_role (which then gets
+    # blocked by RLS on writes that have no user policy).
     supabase_admin: "Client" = create_client(
         settings.SUPABASE_URL,
         settings.SUPABASE_SERVICE_ROLE_KEY,
+    )
+
+    # SEPARATE client used ONLY to verify user login tokens. It can be safely
+    # re-authed by get_user() because we never use it for table operations.
+    supabase_auth: "Client" = create_client(
+        settings.SUPABASE_URL,
+        settings.SUPABASE_ANON_KEY,
     )
 
     def get_supabase_for_token(access_token: str) -> "Client":
