@@ -189,6 +189,32 @@ async def get_audio(job_id: str, user=Depends(get_current_user)):
     return RedirectResponse(storage.presigned_get_url(key, expires=3600))
 
 
+@router.post("/transcript/{job_id}")
+async def save_transcript(
+    job_id: str,
+    transcript_bn: str = Form(""),
+    transcript_en: str = Form(""),
+    user=Depends(get_current_user),
+):
+    """Save the researcher's edited transcript (Bangla + English). Owner-checked.
+    Editing keeps the [H:MM:SS] line prefixes so click-to-play keeps working; the
+    Word export strips them for the clean final document."""
+    result = (
+        supabase_admin.table("transcription_jobs")
+        .select("id")
+        .eq("id", job_id)
+        .eq("user_id", user["_auth_user_id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    supabase_admin.table("transcription_jobs").update(
+        {"transcript_bn": transcript_bn, "transcript_en": transcript_en}
+    ).eq("id", job_id).eq("user_id", user["_auth_user_id"]).execute()
+    return {"ok": True}
+
+
 @router.get("/download/{job_id}/{lang}")
 async def download_transcript(job_id: str, lang: str, user=Depends(get_current_user)):
     if lang not in ("bn", "en", "combined", "docx"):

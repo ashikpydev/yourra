@@ -102,12 +102,11 @@ def _add_transcript(doc, text, bangla=False):
             continue
         stripped = line.strip()
         # Pull a leading timestamp (rendered small and muted, inline before the speaker)
+        # Drop any leading [H:MM:SS] timestamp — the final Word deliverable is
+        # clean (timestamps live only in the website for click-to-play review).
         m = _TS_LEAD.match(stripped)
         if m:
-            ts, stripped = m.group(1), m.group(2).strip()
-            tr = p.add_run(f"[{ts}] ")
-            tr.font.size = Pt(8)
-            tr.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+            stripped = m.group(2).strip()
         if not stripped:
             continue
         # Speaker line: bold the label before the first colon

@@ -59,13 +59,32 @@
       <h2 class="font-display font-bold">Listen &amp; verify</h2>
     </div>
     <p class="text-xs muted mt-1 mb-3">Click any line in the transcript below to play the audio from that exact moment. Audio is kept for {{ retention_days }} days for review, then automatically deleted.</p>
-    <audio x-ref="player" controls preload="none" class="w-full" src="/api/audio/{{ job_id }}" @timeupdate="cur = $event.target.currentTime"></audio>
+    <audio x-ref="player" controls preload="metadata" class="w-full" src="/api/audio/{{ job_id }}"
+           @timeupdate="cur = $event.target.currentTime" @error="audioError = true"></audio>
+    <p x-show="audioError" class="text-xs text-rose-600 mt-2">Audio couldn't be loaded — it may have been removed after the {{ retention_days }}-day review window, or this job was created before audio review was enabled. Re-upload to use playback.</p>
+  </div>
+
+  <!-- Edit toolbar -->
+  <div x-show="status === 'completed'" class="flex items-center flex-wrap gap-3 mb-3">
+    <button x-show="!editing" @click="startEdit()" class="btn btn-secondary btn-sm">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Edit transcript
+    </button>
+    <span x-show="!editing" class="text-xs muted">Fix any errors, then download the clean Word report (no timestamps).</span>
+    <template x-if="editing">
+      <span class="flex items-center flex-wrap gap-2">
+        <button @click="saveEdits()" :disabled="saving" class="btn btn-primary btn-sm" x-text="saving ? 'Saving…' : 'Save changes'"></button>
+        <button @click="cancelEdit()" :disabled="saving" class="btn btn-ghost btn-sm">Cancel</button>
+        <span x-show="saved" class="text-xs text-emerald-700">Saved ✓</span>
+        <span class="text-xs muted">Editing — keep the [time] tags at the start of each line if you want click-to-play to keep working.</span>
+      </span>
+    </template>
   </div>
 
   <div x-show="status === 'completed'" class="grid md:grid-cols-2 gap-6">
     <div class="card card-pad">
       <h2 class="font-display font-bold mb-3">Bangla verbatim</h2>
-      <div class="transcript bn-text">
+      <div class="transcript bn-text" x-show="!editing">
         <template x-for="(ln, i) in bnLines" :key="i">
           <div class="tline" :class="{ 'tline-active': isActive(bnLines, i), 'tline-plain': ln.t === null }" @click="seek(ln.t)">
             <span class="tline-ts" x-show="ln.t !== null" x-text="ln.ts"></span>
@@ -73,10 +92,11 @@
           </div>
         </template>
       </div>
+      <textarea x-show="editing" x-model="editBn" class="field bn-text" style="height:480px;line-height:1.8"></textarea>
     </div>
     <div class="card card-pad">
       <h2 class="font-display font-bold mb-3">English translation</h2>
-      <div class="transcript">
+      <div class="transcript" x-show="!editing">
         <template x-for="(ln, i) in enLines" :key="i">
           <div class="tline" :class="{ 'tline-active': isActive(enLines, i), 'tline-plain': ln.t === null }" @click="seek(ln.t)">
             <span class="tline-ts" x-show="ln.t !== null" x-text="ln.ts"></span>
@@ -84,6 +104,7 @@
           </div>
         </template>
       </div>
+      <textarea x-show="editing" x-model="editEn" class="field" style="height:480px;line-height:1.8"></textarea>
     </div>
   </div>
   {% endif %}
@@ -98,11 +119,44 @@ function resultPage() {
     transcriptBn: {{ (job.transcript_bn if job else '') | tojson }},
     transcriptEn: {{ (job.transcript_en if job else '') | tojson }},
     hasAudio: {{ 'true' if (job and job.audio_r2_key) else 'false' }},
+    audioError: false,
     cur: 0,
     elapsed: 0,
     createdAt: "{{ job.created_at if job else '' }}",
     poller: null,
     ticker: null,
+    editing: false,
+    saving: false,
+    saved: false,
+    editBn: '',
+    editEn: '',
+
+    startEdit() {
+      this.editBn = this.transcriptBn || '';
+      this.editEn = this.transcriptEn || '';
+      this.saved = false;
+      this.editing = true;
+      const p = this.$refs.player; if (p) p.pause();
+    },
+    cancelEdit() { this.editing = false; },
+    async saveEdits() {
+      this.saving = true;
+      try {
+        const form = new FormData();
+        form.append('transcript_bn', this.editBn);
+        form.append('transcript_en', this.editEn);
+        const res = await fetch('/api/transcript/{{ job_id }}', { method: 'POST', body: form });
+        if (!res.ok) throw new Error('save failed');
+        this.transcriptBn = this.editBn;
+        this.transcriptEn = this.editEn;
+        this.editing = false;
+        this.saved = true;
+      } catch (e) {
+        alert('Could not save your changes. Please try again.');
+      } finally {
+        this.saving = false;
+      }
+    },
 
     get bnLines() { return this.parseLines(this.transcriptBn); },
     get enLines() { return this.parseLines(this.transcriptEn); },
