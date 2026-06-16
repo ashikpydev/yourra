@@ -52,14 +52,38 @@
     </div>
   </div>
 
+  <!-- Listen & verify player -->
+  <div x-show="status === 'completed' && hasAudio" class="card card-pad mb-6">
+    <div class="flex items-center gap-2">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-indigo-600"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10v4m4-7v10m4-13v16m4-11v6m4-9v12"/></svg>
+      <h2 class="font-display font-bold">Listen &amp; verify</h2>
+    </div>
+    <p class="text-xs muted mt-1 mb-3">Click any line in the transcript below to play the audio from that exact moment. Audio is kept for {{ retention_days }} days for review, then automatically deleted.</p>
+    <audio x-ref="player" controls preload="none" class="w-full" src="/api/audio/{{ job_id }}" @timeupdate="cur = $event.target.currentTime"></audio>
+  </div>
+
   <div x-show="status === 'completed'" class="grid md:grid-cols-2 gap-6">
     <div class="card card-pad">
       <h2 class="font-display font-bold mb-3">Bangla verbatim</h2>
-      <div class="transcript bn-text" x-text="transcriptBn"></div>
+      <div class="transcript bn-text">
+        <template x-for="(ln, i) in bnLines" :key="i">
+          <div class="tline" :class="{ 'tline-active': isActive(bnLines, i), 'tline-plain': ln.t === null }" @click="seek(ln.t)">
+            <span class="tline-ts" x-show="ln.t !== null" x-text="ln.ts"></span>
+            <span><span class="tline-spk" x-show="ln.label" x-text="ln.label + ': '"></span><span x-text="ln.body"></span></span>
+          </div>
+        </template>
+      </div>
     </div>
     <div class="card card-pad">
       <h2 class="font-display font-bold mb-3">English translation</h2>
-      <div class="transcript" x-text="transcriptEn"></div>
+      <div class="transcript">
+        <template x-for="(ln, i) in enLines" :key="i">
+          <div class="tline" :class="{ 'tline-active': isActive(enLines, i), 'tline-plain': ln.t === null }" @click="seek(ln.t)">
+            <span class="tline-ts" x-show="ln.t !== null" x-text="ln.ts"></span>
+            <span><span class="tline-spk" x-show="ln.label" x-text="ln.label + ': '"></span><span x-text="ln.body"></span></span>
+          </div>
+        </template>
+      </div>
     </div>
   </div>
   {% endif %}
@@ -73,10 +97,57 @@ function resultPage() {
     errorMessage: {{ (job.error_message if job else '') | tojson }},
     transcriptBn: {{ (job.transcript_bn if job else '') | tojson }},
     transcriptEn: {{ (job.transcript_en if job else '') | tojson }},
+    hasAudio: {{ 'true' if (job and job.audio_r2_key) else 'false' }},
+    cur: 0,
     elapsed: 0,
     createdAt: "{{ job.created_at if job else '' }}",
     poller: null,
     ticker: null,
+
+    get bnLines() { return this.parseLines(this.transcriptBn); },
+    get enLines() { return this.parseLines(this.transcriptEn); },
+
+    parseLines(text) {
+      const out = [];
+      (text || '').split('\n').forEach(raw => {
+        const line = raw.trim();
+        if (!line) return;
+        let t = null, rest = line;
+        const m = line.match(/^\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]\s*(.*)$/);
+        if (m) {
+          const hasH = m[3] !== undefined;
+          const h = hasH ? parseInt(m[1]) : 0;
+          const mm = hasH ? parseInt(m[2]) : parseInt(m[1]);
+          const ss = hasH ? parseInt(m[3]) : parseInt(m[2]);
+          t = h * 3600 + mm * 60 + ss;
+          rest = m[4];
+        }
+        let label = '', body = rest;
+        const ci = rest.indexOf(':');
+        if (ci > -1 && ci <= 24) { label = rest.slice(0, ci); body = rest.slice(ci + 1).trim(); }
+        out.push({ t, label, body, ts: t === null ? '' : this.fmt(t) });
+      });
+      return out;
+    },
+    fmt(t) {
+      const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+      const mm = (m < 10 && h > 0 ? '0' : '') + m, ss = (s < 10 ? '0' : '') + s;
+      return (h > 0 ? h + ':' : '') + mm + ':' + ss;
+    },
+    seek(t) {
+      if (t === null) return;
+      const p = this.$refs.player;
+      if (!p) return;
+      p.currentTime = t;
+      p.play().catch(() => {});
+    },
+    isActive(list, i) {
+      const t = list[i].t;
+      if (t === null) return false;
+      let next = Infinity;
+      for (let j = i + 1; j < list.length; j++) { if (list[j].t !== null) { next = list[j].t; break; } }
+      return this.cur >= t && this.cur < next;
+    },
 
     badgeClass(s) {
       return { completed:'badge-green', failed:'badge-rose', pending:'badge-gray',

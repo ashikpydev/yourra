@@ -89,7 +89,8 @@ def _bangla(run):
     rfonts.set(qn("w:cs"), BANGLA_FONT)
 
 
-_TS_RE = re.compile(r"^\[\d{1,2}:\d{2}(?::\d{2})?\]$")
+# Leading timestamp on a line, e.g. "[0:02:00] Moderator: ..." or a bare "[0:02:00]"
+_TS_LEAD = re.compile(r"^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$")
 
 
 def _add_transcript(doc, text, bangla=False):
@@ -100,23 +101,25 @@ def _add_transcript(doc, text, bangla=False):
         if not line:
             continue
         stripped = line.strip()
-        # Timestamp line, e.g. [0:02:00]
-        if _TS_RE.match(stripped):
-            r = p.add_run(stripped)
-            r.bold = True
-            r.font.size = Pt(9)
-            r.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+        # Pull a leading timestamp (rendered small and muted, inline before the speaker)
+        m = _TS_LEAD.match(stripped)
+        if m:
+            ts, stripped = m.group(1), m.group(2).strip()
+            tr = p.add_run(f"[{ts}] ")
+            tr.font.size = Pt(8)
+            tr.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+        if not stripped:
             continue
         # Speaker line: bold the label before the first colon
-        if ":" in line and not stripped.startswith("[") and len(line.split(":", 1)[0]) <= 24:
-            speaker, rest = line.split(":", 1)
+        if ":" in stripped and len(stripped.split(":", 1)[0]) <= 24:
+            speaker, rest = stripped.split(":", 1)
             r1 = p.add_run(speaker + ":")
             r1.bold = True
             r2 = p.add_run(rest)
             if bangla:
                 _bangla(r1); _bangla(r2)
         else:
-            r = p.add_run(line)
+            r = p.add_run(stripped)
             if bangla:
                 _bangla(r)
 

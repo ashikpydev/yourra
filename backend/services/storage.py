@@ -89,3 +89,17 @@ def object_exists(key: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def local_full_path(key: str) -> str:
+    """Absolute disk path for a key (LOCAL_MODE only) — used to stream audio."""
+    return _local_path(key)
+
+
+def presigned_get_url(key: str, expires: int = 3600) -> str:
+    """A short-lived signed URL to GET an R2 object directly (supports range/seek)."""
+    return _client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.R2_BUCKET_NAME, "Key": key},
+        ExpiresIn=expires,
+    )

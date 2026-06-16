@@ -29,6 +29,38 @@ def _update_job(job_id: str, **fields):
     supabase_admin.table("transcription_jobs").update(fields).eq("id", job_id).execute()
 
 
+def cleanup_expired_audio(user_id: str):
+    """Delete audio originals older than R2_RETENTION_DAYS for one user, and
+    null their key. Best-effort; safe to call on every dashboard load."""
+    try:
+        from datetime import datetime, timedelta, timezone
+        cutoff = datetime.now(timezone.utc) - timedelta(days=settings.R2_RETENTION_DAYS)
+        rows = (
+            supabase_admin.table("transcription_jobs")
+            .select("id, audio_r2_key, completed_at")
+            .eq("user_id", user_id)
+            .execute()
+        ).data or []
+        for r in rows:
+            key, comp = r.get("audio_r2_key"), r.get("completed_at")
+            if not key or not comp:
+                continue
+            try:
+                t = datetime.fromisoformat(str(comp).replace("Z", "+00:00"))
+                if t.tzinfo is None:
+                    t = t.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            if t < cutoff:
+                try:
+                    storage.delete_object(key)
+                except Exception:
+                    pass
+                _update_job(r["id"], audio_r2_key=None)
+    except Exception:
+        pass
+
+
 def run_job_sync(job_id: str, user_id: str, r2_key: str, model_name: str, max_minutes=None):
     """Synchronous entrypoint for the RQ worker (it runs sync functions)."""
     import asyncio
@@ -134,13 +166,10 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
         )
         print(f"[pipeline] job {job_id} COMPLETED", flush=True)
 
-        # Free the stored audio now that the transcript is saved — keeps R2
-        # storage near zero so you stay well within the free tier. (The
-        # transcript is in the database; the original is on the user's device.)
-        try:
-            storage.delete_object(r2_key)
-        except Exception:
-            pass
+        # NOTE: the audio is intentionally KEPT (not deleted here) so the
+        # researcher can click any transcript line to play it back and verify
+        # accuracy. It is auto-deleted after R2_RETENTION_DAYS by
+        # cleanup_expired_audio(), called opportunistically on dashboard load.
 
     except Exception as e:
         print(f"[pipeline] job {job_id} FAILED: {e}", flush=True)

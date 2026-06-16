@@ -47,15 +47,15 @@ This segment begins at {start_ts} of the full recording.
 Rules:
 - Transcribe ALL speech fully and accurately in Bangla. Do NOT summarize, paraphrase, shorten, or skip anything; every sentence matters for research.
 - The MODERATOR is the person asking the questions and guiding the discussion. Label their lines "Moderator:". Label the people answering "Respondent 1:", "Respondent 2:", and so on. Use the SAME label for the same voice.
-- Insert an absolute timestamp in square brackets, like [{start_ts}], at the start of this segment and again roughly every 2 minutes, counting forward from {start_ts}. Put each timestamp on its own line.
+- Put ONE speaker turn per line, and BEGIN EVERY line with an absolute timestamp in square brackets in [H:MM:SS] format marking when that turn is spoken, counting forward from {start_ts}. For example: "[{start_ts}] Moderator: ...". The timestamp must be as accurate as possible because it is used to play back the matching audio.
 - Keep natural spoken Bangla verbatim, including fillers, repetitions, and any English words spoken.
 {continuity}
 Return your answer in EXACTLY this format and nothing else:
 BANGLA:
-<timestamps and speaker-labelled verbatim transcript in Bangla script>
+<each line as: [H:MM:SS] Speaker: verbatim Bangla>
 
 ENGLISH:
-<the same content translated to natural English, keeping the same timestamps and speaker labels>
+<the same lines translated to natural English, keeping the SAME [H:MM:SS] timestamp and the SAME speaker label at the start of each line>
 """
 
 DEMO_PROMPT = """From the following research interview transcript, extract any demographic or survey details that are actually mentioned by the respondent or moderator. Return ONLY a compact JSON object with exactly these keys, using an empty string "" when something is not mentioned:
@@ -128,10 +128,12 @@ async def _transcribe_one_with_retry(path, model_name, idx, total, start_ts, pre
 
 def _mock(chunk_paths, offsets):
     bn, en = [], []
+    offs = offsets or [0] * len(chunk_paths)
     for i, _ in enumerate(chunk_paths, 1):
-        ts = _fmt_ts((offsets or [0] * len(chunk_paths))[i - 1])
-        bn.append(f"[{ts}]\nModerator: [লোকাল মক — অংশ {i}] প্রশ্ন।\nRespondent 1: নমুনা উত্তর।")
-        en.append(f"[{ts}]\nModerator: [Local mock — part {i}] question.\nRespondent 1: Sample answer.")
+        base = offs[i - 1]
+        ts1, ts2 = _fmt_ts(base), _fmt_ts(base + 6)
+        bn.append(f"[{ts1}] Moderator: [লোকাল মক — অংশ {i}] আপনার নাম কী?\n[{ts2}] Respondent 1: আমার নাম রিনা।")
+        en.append(f"[{ts1}] Moderator: [Local mock — part {i}] What is your name?\n[{ts2}] Respondent 1: My name is Rina.")
     return "\n\n".join(bn), "\n\n".join(en)
 
 

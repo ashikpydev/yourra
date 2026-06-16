@@ -7,7 +7,7 @@ import math
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from backend.auth import get_current_user
 from backend.config import settings
@@ -154,6 +154,39 @@ async def get_result(job_id: str, user=Depends(get_current_user)):
     if row["status"] != "completed":
         raise HTTPException(status_code=409, detail=f"Job is not completed yet (status: {row['status']})")
     return row
+
+
+@router.get("/audio/{job_id}")
+async def get_audio(job_id: str, user=Depends(get_current_user)):
+    """Stream the original audio back to its owner so the result page can play
+    it from any transcript timestamp. Local mode serves the file directly (with
+    range/seek support); production redirects to a short-lived signed R2 URL."""
+    import mimetypes
+    import os
+
+    result = (
+        supabase_admin.table("transcription_jobs")
+        .select("audio_r2_key, original_filename")
+        .eq("id", job_id)
+        .eq("user_id", user["_auth_user_id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    key = result.data[0].get("audio_r2_key")
+    if not key or not storage.object_exists(key):
+        raise HTTPException(status_code=404, detail="Audio is no longer available for this job.")
+
+    media_type = mimetypes.guess_type(result.data[0].get("original_filename") or key)[0] or "audio/mpeg"
+
+    if settings.LOCAL_MODE:
+        path = storage.local_full_path(key)
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Audio is no longer available for this job.")
+        return FileResponse(path, media_type=media_type)
+
+    return RedirectResponse(storage.presigned_get_url(key, expires=3600))
 
 
 @router.get("/download/{job_id}/{lang}")

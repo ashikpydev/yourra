@@ -67,6 +67,13 @@ async def signup_page(request: Request):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, user=Depends(get_current_user)):
+    # Best-effort: clear expired review audio for this user (fire-and-forget).
+    try:
+        import asyncio
+        from backend.services import pipeline
+        asyncio.create_task(asyncio.to_thread(pipeline.cleanup_expired_audio, user["_auth_user_id"]))
+    except Exception:
+        pass
     jobs = (
         supabase_admin.table("transcription_jobs")
         .select("id, status, progress_pct, original_filename, duration_minutes, "
@@ -101,7 +108,11 @@ async def job_result_page(request: Request, job_id: str, user=Depends(get_curren
     )
     job = result.data[0] if result.data else None
     return templates.TemplateResponse(
-        "result.html", {"request": request, "user": user, "job": job, "job_id": job_id}
+        "result.html",
+        {
+            "request": request, "user": user, "job": job, "job_id": job_id,
+            "retention_days": settings.R2_RETENTION_DAYS,
+        },
     )
 
 
