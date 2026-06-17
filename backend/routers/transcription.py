@@ -147,6 +147,7 @@ async def upload_audio(
                 "audio_r2_key": r2_key,
                 "model_used": model_key,
                 "respondent_meta": respondent_meta_json,
+                "source_language": source_language,
             }
         )
         .execute()
