@@ -112,13 +112,19 @@ def cleanup_expired_audio(user_id: str):
     null their key. Best-effort; safe to call on every dashboard load."""
     try:
         from datetime import datetime, timedelta, timezone
-        cutoff = datetime.now(timezone.utc) - timedelta(days=settings.R2_RETENTION_DAYS)
-        rows = (
-            supabase_admin.table("transcription_jobs")
-            .select("id, audio_r2_key, completed_at")
-            .eq("user_id", user_id)
-            .execute()
-        ).data or []
+
+        default_days = settings.R2_RETENTION_DAYS
+        base = supabase_admin.table("transcription_jobs")
+        # Read retention_days if the column exists; fall back gracefully so this
+        # keeps working before the schema migration has been applied.
+        try:
+            rows = base.select("id, audio_r2_key, completed_at, retention_days").eq(
+                "user_id", user_id).execute().data or []
+        except Exception:
+            rows = base.select("id, audio_r2_key, completed_at").eq(
+                "user_id", user_id).execute().data or []
+
+        now = datetime.now(timezone.utc)
         for r in rows:
             key, comp = r.get("audio_r2_key"), r.get("completed_at")
             if not key or not comp:
@@ -129,7 +135,10 @@ def cleanup_expired_audio(user_id: str):
                     t = t.replace(tzinfo=timezone.utc)
             except Exception:
                 continue
-            if t < cutoff:
+            # Per-job retention, clamped to [1, default]. Null -> default.
+            days = r.get("retention_days")
+            days = default_days if not days else max(1, min(int(days), default_days))
+            if t < now - timedelta(days=days):
                 try:
                     storage.delete_object(key)
                 except Exception:

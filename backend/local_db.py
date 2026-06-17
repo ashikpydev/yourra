@@ -69,7 +69,8 @@ _DDL = [
         progress_pct integer default 0, original_filename text, audio_r2_key text,
         duration_minutes real, credits_used integer, model_used text,
         transcript_bn text, transcript_en text, chunk_count integer,
-        error_message text, respondent_meta text, created_at text, completed_at text)""",
+        error_message text, respondent_meta text, retention_days integer,
+        created_at text, completed_at text)""",
     """create table if not exists credit_transactions (
         id text primary key, user_id text, minutes_added integer,
         transaction_type text, bkash_reference text, notes text,
@@ -326,6 +327,7 @@ class LocalDB:
             # first created (ALTER is a no-op-with-error if it already exists).
             for table, col, typ in [
                 ("transcription_jobs", "respondent_meta", "text"),
+                ("transcription_jobs", "retention_days", "integer"),
                 ("user_profiles", "is_active", "integer default 1"),
                 ("user_profiles", "full_name", "text"),
                 ("user_profiles", "organization", "text"),

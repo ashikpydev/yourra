@@ -65,10 +65,26 @@ async def upload_audio(
     interviewer: str = Form(""),
     interview_date: str = Form(""),
     source_language: str = Form("auto"),
+    retention_days: int = Form(7),
+    consent: str = Form(""),
     user=Depends(get_current_user),
 ):
     import json
     import os
+
+    # Ethics gate: the researcher must affirm they have the right/consent to
+    # process this recording. Enforced server-side too, not just in the UI.
+    if str(consent).strip().lower() not in ("true", "on", "1", "yes"):
+        raise HTTPException(
+            status_code=400,
+            detail="Please confirm you have consent to upload and transcribe this recording.",
+        )
+
+    # Clamp retention to 1..7 days (default 7).
+    try:
+        retention_days = max(1, min(int(retention_days), 7))
+    except (TypeError, ValueError):
+        retention_days = 7
 
     respondent_meta = {
         "survey_type": survey_type, "resp_name": resp_name, "resp_age": resp_age,
@@ -135,6 +151,16 @@ async def upload_audio(
         )
         .execute()
     )
+
+    # Store the researcher's chosen audio retention. Best-effort + separate from
+    # the insert so a not-yet-migrated DB (missing column) can't break uploads;
+    # cleanup falls back to the default until the column exists.
+    try:
+        supabase_admin.table("transcription_jobs").update(
+            {"retention_days": retention_days}
+        ).eq("id", job_id).execute()
+    except Exception:
+        pass
 
     # Prefer the Redis queue (separate worker) in production; fall back to an
     # in-process background task when no queue is configured.

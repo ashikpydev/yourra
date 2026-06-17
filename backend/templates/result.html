@@ -69,7 +69,7 @@
       <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-indigo-600"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10v4m4-7v10m4-13v16m4-11v6m4-9v12"/></svg>
       <h2 class="font-display font-bold">Listen &amp; verify</h2>
     </div>
-    <p class="text-xs muted mt-1 mb-3">Click any line in the transcript below to play the audio from that exact moment. Audio is kept for {{ retention_days }} days for review, then automatically deleted.</p>
+    <p class="text-xs muted mt-1 mb-3">Click any line in the transcript below to play the audio from that exact moment. Audio is kept for {{ job.retention_days or retention_days }} day(s) for review, then automatically deleted. <a href="/privacy" class="text-indigo-600 font-medium">Privacy &amp; ethics →</a></p>
     <audio x-ref="player" controls preload="metadata" class="w-full" src="/api/audio/{{ job_id }}"
            @timeupdate="onTime($event.target.currentTime)" @error="audioError = true"></audio>
     <div class="flex items-center justify-between flex-wrap gap-2 mt-2">
@@ -78,7 +78,7 @@
       </label>
       <span class="text-xs muted">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> ±5s · <kbd>N</kbd> next flagged</span>
     </div>
-    <p x-show="audioError" class="text-xs text-rose-600 mt-2">Audio couldn't be loaded — it may have been removed after the {{ retention_days }}-day review window, or this job was created before audio review was enabled. Re-upload to use playback.</p>
+    <p x-show="audioError" class="text-xs text-rose-600 mt-2">Audio couldn't be loaded — it may have been removed after the {{ job.retention_days or retention_days }}-day review window, or this job was created before audio review was enabled. Re-upload to use playback.</p>
   </div>
 
   <!-- Edit hint -->

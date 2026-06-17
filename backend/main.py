@@ -245,6 +245,15 @@ async def submit_trial_request(
     return RedirectResponse(url="/trial?submitted=1", status_code=303)
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy(request: Request):
+    user = await get_optional_user(request)
+    return templates.TemplateResponse(
+        "privacy.html",
+        {"request": request, "user": user, "retention_days": settings.R2_RETENTION_DAYS},
+    )
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

@@ -97,6 +97,9 @@ alter table user_profiles add column if not exists is_active integer default 1;
 alter table user_profiles add column if not exists full_name text;
 alter table user_profiles add column if not exists organization text;
 alter table transcription_jobs add column if not exists respondent_meta text;
+-- Per-job audio retention chosen by the researcher (1..7 days). Null = use the
+-- R2_RETENTION_DAYS default. Audio is auto-deleted after this many days.
+alter table transcription_jobs add column if not exists retention_days integer;
 
 -- ---- Row Level Security ------------------------------------
 alter table user_profiles enable row level security;

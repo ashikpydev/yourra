@@ -61,6 +61,18 @@
           </div>
 
           <div class="mt-4">
+            <label class="label">Delete my audio after</label>
+            <select x-model.number="retentionDays" class="field">
+              <option value="1">1 day</option>
+              <option value="2">2 days</option>
+              <option value="3">3 days</option>
+              <option value="5">5 days</option>
+              <option value="7">7 days (maximum)</option>
+            </select>
+            <p class="text-xs muted mt-1">Your uploaded audio is automatically and permanently deleted after this many days. Your transcript stays in your account until you delete it. <a href="/privacy" class="text-indigo-600 font-medium">How we protect your data →</a></p>
+          </div>
+
+          <div class="mt-4">
             <button type="button" class="text-sm text-indigo-600 font-medium" @click="showMeta = !showMeta">
               <span x-show="!showMeta">Add survey and respondent details (for the Word report)</span>
               <span x-show="showMeta">Hide details</span>
@@ -96,8 +108,13 @@
             </template>
           </p>
 
+          <label class="flex items-start gap-2 text-xs mt-4 cursor-pointer">
+            <input type="checkbox" x-model="consent" class="mt-0.5">
+            <span class="muted">I confirm I have the right and the necessary <strong>consent</strong> from participants to upload and transcribe this recording, in line with my research ethics approval.</span>
+          </label>
+
           <div class="mt-4 flex items-center gap-3">
-            <button type="submit" :disabled="uploading || profile.credits_minutes <= 0" class="btn btn-primary">
+            <button type="submit" :disabled="uploading || profile.credits_minutes <= 0 || !consent" class="btn btn-primary">
               <span x-show="!uploading">Upload &amp; transcribe</span>
               <span x-show="uploading" x-text="uploadPct < 100 ? ('Uploading… ' + uploadPct + '%') : 'Submitting…'"></span>
             </button>
@@ -112,6 +129,10 @@
         <div class="mt-4 flex items-start gap-2 rounded-lg p-3 text-xs" style="background:var(--brand-50);color:var(--ink-700)">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0 mt-0.5 text-indigo-600"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 11v5M12 7.5h.01"/></svg>
           <span><strong>Accuracy note:</strong> Output quality depends on your audio. On clear recordings with little background noise and one person speaking at a time, YourRA reaches up to about 90&ndash;95% accuracy. Heavy noise, echo, or overlapping speech lowers this. We recommend a quick review before final use.</span>
+        </div>
+        <div class="mt-3 flex items-start gap-2 rounded-lg p-3 text-xs" style="background:#ecfdf5;color:#065f46">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0 mt-0.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V7l7-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12.5l1.8 1.8 3.2-3.6"/></svg>
+          <span><strong>Your data is protected:</strong> encrypted transfer &amp; storage, private to your account, never used to train AI, and your audio is auto-deleted on the schedule you choose. <a href="/privacy" class="font-semibold underline">Read our privacy &amp; ethics commitments →</a></span>
         </div>
       </div>
 
@@ -238,6 +259,8 @@ function dashboard() {
     showMeta: false,
     meta: { survey_type:'', resp_name:'', resp_age:'', resp_sex:'', resp_education:'', resp_profession:'', resp_location:'', interviewer:'', interview_date:'' },
     sourceLanguage: 'auto',
+    retentionDays: 7,
+    consent: false,
     selectedBundle: '',
     customHours: 5,
     get customPrice() { return Math.round(this.customHours * 399); },
@@ -319,6 +342,10 @@ function dashboard() {
       const file = this.$refs.fileInput.files[0];
       if (!file) return;
       this.uploadError = '';
+      if (!this.consent) {
+        this.uploadError = 'Please confirm you have consent to upload this recording.';
+        return;
+      }
       const left = this.profile.credits_minutes;
       if (left <= 0) {
         this.uploadError = 'You have 0 minutes left. Please top up below before uploading.';
@@ -340,13 +367,15 @@ function dashboard() {
       const form = new FormData();
       form.append('audio', file);
       form.append('source_language', this.sourceLanguage);
+      form.append('retention_days', this.retentionDays);
+      form.append('consent', 'true');
       for (const [k, v] of Object.entries(this.meta)) { if (v) form.append(k, v); }
       try {
         await this.sendUpload(form);
         this.$refs.fileInput.value = '';
         this.fileName = '';
         this.uploadSuccess = 'File submitted for transcription. You can upload another file now.';
-        this.estReady = false; this.estMin = 0;
+        this.estReady = false; this.estMin = 0; this.consent = false;
         await this.refresh();
         this.ensurePolling();
       } catch (e) {
