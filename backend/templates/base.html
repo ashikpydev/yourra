@@ -102,6 +102,36 @@
         if (btn) { var o = btn.innerText; btn.innerText = 'Copied!'; setTimeout(function () { btn.innerText = o; }, 1500); }
       });
     }
+
+    // Smooth-scroll in-page section links (e.g. "How it works") and keep the
+    // address bar clean — no "#how" left in the URL.
+    (function () {
+      function scrollToHash(hash) {
+        if (!hash || hash === '#') return false;
+        var el = null;
+        try { el = document.querySelector(hash); } catch (e) { return false; }
+        if (!el) return false;
+        el.scrollIntoView({ behavior: 'smooth' });
+        return true;
+      }
+      document.addEventListener('click', function (e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href*="#"]') : null;
+        if (!a) return;
+        var url;
+        try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
+        if (url.pathname === location.pathname && url.hash) {
+          if (scrollToHash(url.hash)) {
+            e.preventDefault();
+            history.replaceState(null, '', location.pathname + location.search);
+          }
+        }
+      });
+      window.addEventListener('load', function () {
+        if (location.hash && scrollToHash(location.hash)) {
+          history.replaceState(null, '', location.pathname + location.search);
+        }
+      });
+    })();
   </script>
 </body>
 </html>
