@@ -147,6 +147,21 @@ async def reset_password(access_token: str = Form(...), new_password: str = Form
     return {"ok": True}
 
 
+@router.post("/api/auth/update-profile")
+async def update_profile(
+    request: Request,
+    full_name: str = Form(""),
+    organization: str = Form(""),
+):
+    from backend.auth import get_current_user
+    user = await get_current_user(request)
+    supabase_admin.table("user_profiles").update({
+        "full_name": full_name.strip() or None,
+        "organization": organization.strip() or None,
+    }).eq("id", user["_auth_user_id"]).execute()
+    return {"ok": True}
+
+
 @router.post("/api/auth/change-password")
 async def change_password(
     request: Request,

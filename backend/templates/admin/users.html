@@ -9,7 +9,7 @@
 <!-- Add user -->
 <div class="card card-pad mb-6">
   <h2 class="font-display font-bold mb-1">Add a user</h2>
-  <p class="text-xs muted mb-4">Creates a new account, grants the minutes you set, and emails the person their login. (To top up someone who already has an account, use "Manually activate credits" on the dashboard.)</p>
+  <p class="text-xs muted mb-4">Creates a new account and emails the person an invite link so they can set their own password. Supabase sends the invite email for free. (To top up someone who already has an account, use "Manually activate credits" on the dashboard.)</p>
   <form action="/admin/users/add" method="post" class="flex flex-wrap gap-3 items-end">
     <div>
       <label class="label">Email</label>
@@ -55,6 +55,10 @@
             <button class="btn btn-secondary btn-sm">Pause</button>
           </form>
           {% endif %}
+          <form action="/admin/users/send-reset" method="post" class="inline">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <button class="btn btn-secondary btn-sm">Send reset email</button>
+          </form>
           <form action="/admin/users/delete" method="post" class="inline" onsubmit="return confirm('Delete {{ u.email }} and all their jobs? This cannot be undone.');">
             <input type="hidden" name="email" value="{{ u.email }}">
             <button class="btn btn-danger btn-sm">Delete</button>

@@ -71,46 +71,57 @@ async def admin_users(request: Request):
 
 @router.post("/users/add")
 async def admin_add_user(email: str = Form(...), minutes: int = Form(0)):
-    """Create a brand-new user account, grant initial minutes, and email them
-    their login. (To top up an EXISTING user, use 'Manually activate credits'.)"""
+    """Create a new account via Supabase invite email (free, no SMTP needed).
+    The user gets an email with a link to set their own password."""
     email = email.strip().lower()
-    password = secrets.token_urlsafe(9)
     try:
         if settings.LOCAL_MODE:
-            result = supabase_auth.auth.sign_up({"email": email, "password": password})
+            pw = secrets.token_urlsafe(12)
+            result = supabase_auth.auth.sign_up({"email": email, "password": pw})
         else:
-            # Production: create an already-confirmed account (no verification email needed).
-            # admin.create_user uses the service-role admin endpoint and does NOT
-            # set a user session, so it's safe on supabase_admin.
-            result = supabase_admin.auth.admin.create_user(
-                {"email": email, "password": password, "email_confirm": True}
+            redirect_url = settings.APP_BASE_URL.rstrip("/") + "/reset-password"
+            result = supabase_admin.auth.admin.invite_user_by_email(
+                email, {"redirect_to": redirect_url}
             )
     except Exception:
-        return RedirectResponse(url="/admin/users?msg=User%20may%20already%20exist", status_code=303)
+        return RedirectResponse(url="/admin/users?msg=User+may+already+exist", status_code=303)
 
     uid = getattr(getattr(result, "user", None), "id", None)
     if not uid:
-        return RedirectResponse(url="/admin/users?msg=Could%20not%20create%20user", status_code=303)
+        return RedirectResponse(url="/admin/users?msg=Could+not+create+user", status_code=303)
 
-    supabase_admin.table("user_profiles").insert(
-        {"id": uid, "email": email, "credits_minutes": int(minutes or 0),
-         "trial_used": True, "is_active": 1}
-    ).execute()
+    existing = supabase_admin.table("user_profiles").select("id").eq("id", uid).execute()
+    if not existing.data:
+        supabase_admin.table("user_profiles").insert(
+            {"id": uid, "email": email, "credits_minutes": int(minutes or 0),
+             "trial_used": True, "is_active": 1}
+        ).execute()
+    elif minutes:
+        cur = existing.data[0].get("credits_minutes", 0) or 0
+        supabase_admin.table("user_profiles").update(
+            {"credits_minutes": cur + int(minutes)}
+        ).eq("id", uid).execute()
+
     if minutes:
         supabase_admin.table("credit_transactions").insert(
             {"user_id": uid, "minutes_added": int(minutes), "transaction_type": "manual_bkash",
              "notes": "Admin created account", "activated_by": "admin"}
         ).execute()
 
-    login_url = settings.APP_BASE_URL.rstrip("/") + "/login"
-    body = (
-        f"Hello,\n\nAn account has been created for you on YourRA.\n\n"
-        f"Login page: {login_url}\nEmail: {email}\nTemporary password: {password}\n\n"
-        f"Please log in and keep this password safe.\n\nYourRA"
-    )
-    sent = mailer.send_email(email, "Your YourRA account is ready", body)
-    note = "User created and emailed" if sent else "User created (email not configured, password: %s)" % password
-    return RedirectResponse(url=f"/admin/users?msg={note.replace(' ', '%20')}", status_code=303)
+    note = "Invite sent to %s" % email if not settings.LOCAL_MODE else "User created (LOCAL_MODE)"
+    return RedirectResponse(url=f"/admin/users?msg={note.replace(' ', '+')}", status_code=303)
+
+
+@router.post("/users/send-reset")
+async def admin_send_reset(email: str = Form(...)):
+    """Send a password reset email to an existing user (via Supabase free email)."""
+    email = email.strip().lower()
+    try:
+        redirect_url = settings.APP_BASE_URL.rstrip("/") + "/reset-password"
+        supabase_auth.auth.reset_password_email(email, {"redirect_to": redirect_url})
+    except Exception:
+        pass
+    return RedirectResponse(url="/admin/users?msg=Reset+email+sent+to+%s" % email, status_code=303)
 
 
 @router.post("/users/pause")

@@ -7,6 +7,32 @@
     <p class="muted text-sm mb-8">{{ user.email }}</p>
 
     <div class="card card-pad mb-6" x-data="{ loading: false, error: '', success: '' }">
+      <h2 class="text-base font-semibold mb-4">Profile details</h2>
+      <form @submit.prevent="
+        loading = true; error = ''; success = '';
+        fetch('/api/auth/update-profile', { method: 'POST', body: new FormData($el) })
+          .then(async r => {
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Failed');
+            success = 'Profile updated.';
+          })
+          .catch(e => { error = e.message; })
+          .finally(() => { loading = false; })
+      ">
+        <label class="label">Full name</label>
+        <input type="text" name="full_name" value="{{ user.full_name or '' }}" class="field mb-4" placeholder="Your name">
+        <label class="label">Organization</label>
+        <input type="text" name="organization" value="{{ user.organization or '' }}" class="field mb-5" placeholder="University, NGO, institute...">
+        <button type="submit" :disabled="loading" class="btn btn-primary w-full">
+          <span x-show="!loading">Save details</span>
+          <span x-show="loading">Saving…</span>
+        </button>
+        <p x-show="error" x-text="error" class="text-rose-600 text-sm mt-3"></p>
+        <p x-show="success" x-text="success" class="text-green-600 text-sm mt-3"></p>
+      </form>
+    </div>
+
+    <div class="card card-pad mb-6" x-data="{ loading: false, error: '', success: '' }">
       <h2 class="text-base font-semibold mb-4">Change password</h2>
       <form @submit.prevent="
         loading = true; error = ''; success = '';
