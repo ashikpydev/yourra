@@ -139,6 +139,54 @@ def cleanup_expired_audio(user_id: str):
         pass
 
 
+def recover_stuck_jobs(user_id: str):
+    """Mark a user's long-stalled jobs as 'failed' so they become retryable.
+
+    On free hosting the web process can restart/sleep, which silently drops any
+    in-process queued or running job — it would otherwise sit in 'processing' or
+    'pending' forever with no way to recover. This is best-effort and cheap: it
+    runs opportunistically on dashboard load (in a thread), scoped to one user,
+    with generous thresholds so real long-running jobs are never touched.
+    """
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        proc_cutoff = now - timedelta(minutes=settings.STUCK_JOB_MINUTES)
+        pend_cutoff = now - timedelta(minutes=settings.STUCK_PENDING_MINUTES)
+
+        rows = (
+            supabase_admin.table("transcription_jobs")
+            .select("id, status, created_at")
+            .eq("user_id", user_id)
+            .in_("status", ["pending", "processing", "merging"])
+            .execute()
+        ).data or []
+
+        for r in rows:
+            created = r.get("created_at")
+            try:
+                t = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+                if t.tzinfo is None:
+                    t = t.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            stuck = (
+                (r["status"] in ("processing", "merging") and t < proc_cutoff)
+                or (r["status"] == "pending" and t < pend_cutoff)
+            )
+            if stuck:
+                _update_job(
+                    r["id"],
+                    status="failed",
+                    error_message="This job stalled (the server likely restarted). "
+                                  "Click Retry to run it again — no re-upload needed.",
+                )
+                print(f"[watchdog] recovered stuck job {r['id']} (was {r['status']})", flush=True)
+    except Exception:
+        pass
+
+
 def run_job_sync(job_id: str, user_id: str, r2_key: str, model_name: str, max_minutes=None):
     """Synchronous entrypoint for the RQ worker (it runs sync functions)."""
     import asyncio

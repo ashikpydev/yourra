@@ -67,11 +67,15 @@ async def signup_page(request: Request):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, user=Depends(get_current_user)):
-    # Best-effort: clear expired review audio for this user (fire-and-forget).
+    # Best-effort housekeeping for this user (fire-and-forget, off the request
+    # path): clear expired review audio, and recover any jobs left stuck by a
+    # server restart so they can be retried.
     try:
         import asyncio
         from backend.services import pipeline
-        asyncio.create_task(asyncio.to_thread(pipeline.cleanup_expired_audio, user["_auth_user_id"]))
+        uid = user["_auth_user_id"]
+        asyncio.create_task(asyncio.to_thread(pipeline.cleanup_expired_audio, uid))
+        asyncio.create_task(asyncio.to_thread(pipeline.recover_stuck_jobs, uid))
     except Exception:
         pass
     jobs = (

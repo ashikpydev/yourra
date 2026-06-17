@@ -38,7 +38,7 @@
             <svg width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
             <span class="text-sm font-medium text-slate-600" x-text="fileName || 'Click to choose an audio file'"></span>
             <input type="file" name="audio" x-ref="fileInput" accept=".mp3,.wav,.m4a,.ogg,.mp4" required class="hidden"
-                   @change="fileName = $refs.fileInput.files[0]?.name || ''">
+                   @change="onFilePick()">
           </label>
 
           <div class="mt-4">
@@ -66,6 +66,16 @@
               <div><label class="label">Interview date</label><input type="date" x-model="meta.interview_date" class="field"></div>
             </div>
           </div>
+
+          <p x-show="estReady && !uploading" x-cloak class="text-sm mt-4"
+             :class="estMin > profile.credits_minutes ? 'text-amber-600' : 'muted'">
+            <template x-if="estMin <= profile.credits_minutes">
+              <span>This file is about <strong x-text="estMin"></strong> min. You have <span x-text="profile.credits_minutes"></span> min — about <strong x-text="Math.max(0, profile.credits_minutes - estMin)"></strong> min will remain after.</span>
+            </template>
+            <template x-if="estMin > profile.credits_minutes">
+              <span>This file is about <strong x-text="estMin"></strong> min, but you have only <strong x-text="profile.credits_minutes"></strong> min. Only the first <span x-text="profile.credits_minutes"></span> min will be transcribed.</span>
+            </template>
+          </p>
 
           <div class="mt-4 flex items-center gap-3">
             <button type="submit" :disabled="uploading || profile.credits_minutes <= 0" class="btn btn-primary">
@@ -215,9 +225,36 @@ function dashboard() {
     toppingUp: false,
     topupMessage: '',
     pollHandle: null,
+    estMin: 0,
+    estReady: false,
 
     init() {
-      this.pollHandle = setInterval(() => this.refresh(), 8000);
+      this.refresh().then(() => this.ensurePolling());
+    },
+
+    hasActiveJobs() {
+      return this.jobs.some(j => ['pending', 'processing', 'merging'].includes(j.status));
+    },
+
+    // Poll ONLY while something is in progress. Idle tabs (just viewing finished
+    // transcripts) make no requests at all — this keeps server/database load low
+    // when many people are signed in at the same time.
+    ensurePolling() {
+      if (this.pollHandle || !this.hasActiveJobs()) return;
+      this.pollHandle = setInterval(async () => {
+        await this.refresh();
+        if (!this.hasActiveJobs()) { clearInterval(this.pollHandle); this.pollHandle = null; }
+      }, 10000);
+    },
+
+    async onFilePick() {
+      const file = this.$refs.fileInput.files[0];
+      this.fileName = file?.name || '';
+      this.estMin = 0; this.estReady = false;
+      this.uploadError = ''; this.uploadSuccess = '';
+      if (!file) return;
+      const sec = await this.getDuration(file);
+      if (sec) { this.estMin = Math.ceil(sec / 60); this.estReady = true; }
     },
 
     barWidth() {
@@ -288,7 +325,9 @@ function dashboard() {
         this.$refs.fileInput.value = '';
         this.fileName = '';
         this.uploadSuccess = 'File submitted for transcription. You can upload another file now.';
+        this.estReady = false; this.estMin = 0;
         await this.refresh();
+        this.ensurePolling();
       } catch (e) {
         this.uploadError = e.message;
       } finally {
@@ -324,6 +363,7 @@ function dashboard() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || 'Could not retry this job.');
         await this.refresh();
+        this.ensurePolling();
       } catch (e) { alert(e.message); }
     },
 

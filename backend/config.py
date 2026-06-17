@@ -91,5 +91,14 @@ class Settings:
     # R2 retention for original uploads (days)
     R2_RETENTION_DAYS: int = int(os.getenv("R2_RETENTION_DAYS", "7"))
 
+    # Stuck-job recovery (watchdog). On free hosting the web dyno can restart or
+    # sleep, dropping in-process queued jobs so they hang forever. These caps let
+    # an opportunistic watchdog mark long-stalled jobs as "failed" so the user
+    # can simply click Retry. Generous defaults so genuine long jobs aren't hit:
+    #   * a job actively "processing" for this many minutes is treated as dead
+    STUCK_JOB_MINUTES: int = int(os.getenv("STUCK_JOB_MINUTES", "60"))
+    #   * a job still "pending" (never started) for this many minutes is failed
+    STUCK_PENDING_MINUTES: int = int(os.getenv("STUCK_PENDING_MINUTES", "180"))
+
 
 settings = Settings()
