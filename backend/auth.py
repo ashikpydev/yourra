@@ -8,13 +8,17 @@ Auth helpers.
   refreshes the session and stashes the new tokens on request.state so a
   middleware can re-set the cookies — keeping users logged in for the full
   cookie lifetime instead of just the ~1 hour access-token window.
-- require_admin: HTTP Basic Auth dependency for /admin/* routes.
+- require_admin: Cookie-based session gate for /admin/* routes.
+  Sessions are HMAC-signed so they survive server restarts and multi-worker
+  deployments without any shared state.
 """
+import hashlib
+import hmac
 import secrets
 import time
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic
 
 from backend.config import settings
 from backend.database import supabase_admin, supabase_auth
@@ -25,35 +29,47 @@ ACCESS_COOKIE = "sb_access_token"
 REFRESH_COOKIE = "sb_refresh_token"
 ADMIN_COOKIE = "ya_admin_session"
 
-# In-memory admin sessions {token: expiry_unix}
-_admin_sessions: dict[str, float] = {}
 _ADMIN_SESSION_TTL = 8 * 3600  # 8 hours
 
 
+def _sign(payload: str) -> str:
+    """HMAC-SHA256 signature using APP_SECRET_KEY."""
+    return hmac.new(
+        settings.APP_SECRET_KEY.encode(),
+        payload.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def create_admin_session() -> str:
-    token = secrets.token_urlsafe(32)
-    now = time.time()
-    _admin_sessions[token] = now + _ADMIN_SESSION_TTL
-    # Prune expired entries
-    expired = [k for k, v in list(_admin_sessions.items()) if v < now]
-    for k in expired:
-        _admin_sessions.pop(k, None)
-    return token
+    """Return a signed token: '<random>.<expiry>.<sig>'."""
+    nonce = secrets.token_urlsafe(24)
+    expiry = int(time.time()) + _ADMIN_SESSION_TTL
+    payload = f"{nonce}.{expiry}"
+    sig = _sign(payload)
+    return f"{payload}.{sig}"
 
 
 def verify_admin_session(token: str | None) -> bool:
+    """Verify signature and expiry. No server-side state required."""
     if not token:
         return False
-    expiry = _admin_sessions.get(token)
-    if not expiry or expiry < time.time():
-        _admin_sessions.pop(token, None)
+    try:
+        parts = token.rsplit(".", 1)
+        if len(parts) != 2:
+            return False
+        payload, sig = parts
+        if not hmac.compare_digest(sig, _sign(payload)):
+            return False
+        expiry = int(payload.split(".", 1)[1])
+        return time.time() < expiry
+    except Exception:
         return False
-    return True
 
 
 def revoke_admin_session(token: str | None):
-    if token:
-        _admin_sessions.pop(token, None)
+    # Signed tokens are stateless; revocation is handled by cookie deletion.
+    pass
 
 
 def _extract_token(request: Request) -> str | None:
