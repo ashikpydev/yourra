@@ -9,6 +9,7 @@ Admin panel: HTTP Basic Auth protected.
 - /admin/activate    manual credit grant (fallback / adjustments)
 """
 import secrets
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -22,6 +23,18 @@ from backend.services import mailer
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 templates = Jinja2Templates(directory="backend/templates")
+
+
+def _make_temp_password() -> str:
+    """Human-readable temp password the admin can share via WhatsApp."""
+    return "YR-" + secrets.token_urlsafe(8)
+
+
+def _create_auth_user(email: str, password: str):
+    """Create a confirmed Supabase auth user. Returns user object or raises."""
+    return supabase_admin.auth.admin.create_user(
+        {"email": email, "password": password, "email_confirm": True}
+    )
 
 
 @router.get("")
@@ -80,18 +93,10 @@ async def admin_users(request: Request):
 
 @router.post("/users/add")
 async def admin_add_user(email: str = Form(...), minutes: int = Form(0)):
-    """Create a new account via Supabase invite email (free, no SMTP needed).
-    The user gets an email with a link to set their own password."""
     email = email.strip().lower()
+    pw = _make_temp_password()
     try:
-        if settings.LOCAL_MODE:
-            pw = secrets.token_urlsafe(12)
-            result = supabase_auth.auth.sign_up({"email": email, "password": pw})
-        else:
-            redirect_url = settings.APP_BASE_URL.rstrip("/") + "/reset-password"
-            result = supabase_admin.auth.admin.invite_user_by_email(
-                email, {"redirect_to": redirect_url}
-            )
+        result = _create_auth_user(email, pw)
     except Exception:
         return RedirectResponse(url="/admin/users?msg=User+may+already+exist", status_code=303)
 
@@ -117,8 +122,8 @@ async def admin_add_user(email: str = Form(...), minutes: int = Form(0)):
              "notes": "Admin created account", "activated_by": "admin"}
         ).execute()
 
-    note = "Invite sent to %s" % email if not settings.LOCAL_MODE else "User created (LOCAL_MODE)"
-    return RedirectResponse(url=f"/admin/users?msg={note.replace(' ', '+')}", status_code=303)
+    msg = urllib.parse.quote(f"CREDENTIALS|{email}|{pw}")
+    return RedirectResponse(url=f"/admin/users?creds={msg}", status_code=303)
 
 
 @router.post("/users/send-reset")
@@ -326,7 +331,6 @@ async def admin_trials(request: Request):
 
 @router.post("/trials/{trial_id}/grant")
 async def grant_trial(trial_id: str, minutes: int = Form(60)):
-    """Invite the trial requester and grant them starting credits."""
     row = supabase_admin.table("trial_requests").select("*").eq("id", trial_id).execute()
     if not row.data:
         return RedirectResponse(url="/admin/trials?msg=Not+found", status_code=303)
@@ -335,22 +339,23 @@ async def grant_trial(trial_id: str, minutes: int = Form(60)):
     if not email:
         return RedirectResponse(url="/admin/trials?msg=No+email+on+request", status_code=303)
 
-    # Invite or find existing user
+    pw = _make_temp_password()
+    uid = None
+    new_account = False
+
     try:
-        if settings.LOCAL_MODE:
-            pw = secrets.token_urlsafe(12)
-            result = supabase_auth.auth.sign_up({"email": email, "password": pw})
-        else:
-            redirect_url = settings.APP_BASE_URL.rstrip("/") + "/reset-password"
-            result = supabase_admin.auth.admin.invite_user_by_email(
-                email, {"redirect_to": redirect_url}
-            )
+        result = _create_auth_user(email, pw)
         uid = getattr(getattr(result, "user", None), "id", None)
+        new_account = True
     except Exception:
-        # User may already exist — look up by email
-        existing_auth = supabase_admin.table("user_profiles").select("id, credits_minutes").eq("email", email).execute()
-        if existing_auth.data:
-            uid = existing_auth.data[0]["id"]
+        # User already exists — just add credits, reset their password
+        existing_prof = supabase_admin.table("user_profiles").select("id").eq("email", email).execute()
+        if existing_prof.data:
+            uid = existing_prof.data[0]["id"]
+            try:
+                supabase_admin.auth.admin.update_user_by_id(uid, {"password": pw})
+            except Exception:
+                pass
         else:
             return RedirectResponse(url="/admin/trials?msg=Failed+to+create+account", status_code=303)
 
@@ -373,7 +378,8 @@ async def grant_trial(trial_id: str, minutes: int = Form(60)):
         ).execute()
 
     supabase_admin.table("trial_requests").update({"status": "granted"}).eq("id", trial_id).execute()
-    return RedirectResponse(url="/admin/trials?msg=Access+granted+to+%s" % email, status_code=303)
+    msg = urllib.parse.quote(f"CREDENTIALS|{email}|{pw}")
+    return RedirectResponse(url=f"/admin/trials?creds={msg}", status_code=303)
 
 
 @router.post("/trials/{trial_id}/reject")
