@@ -7,7 +7,8 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from backend.auth import ACCESS_COOKIE, REFRESH_COOKIE
 from backend.config import settings
 from backend.database import supabase_admin, supabase_auth
-from backend.services.trial import is_disposable_email
+from backend.services import ratelimit
+from backend.services.trial import client_ip, is_disposable_email
 
 router = APIRouter(tags=["auth"])
 
@@ -17,11 +18,16 @@ COOKIE_NAME = ACCESS_COOKIE
 
 @router.post("/signup")
 async def signup(
+    request: Request,
     email: str = Form(...),
     password: str = Form(...),
     full_name: str = Form(""),
     organization: str = Form(""),
 ):
+    if ratelimit.too_many(f"signup:{client_ip(request)}", max_hits=10, window_seconds=3600):
+        raise HTTPException(status_code=429, detail="Too many signups from this network. Please try again later.")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
     if await is_disposable_email(email):
         raise HTTPException(status_code=400, detail="Please use a permanent email address.")
 
@@ -58,7 +64,12 @@ async def signup(
 
 
 @router.post("/login")
-async def login(email: str = Form(...), password: str = Form(...)):
+async def login(request: Request, email: str = Form(...), password: str = Form(...)):
+    # Throttle brute-force: cap attempts per IP and per email.
+    ip = client_ip(request)
+    if (ratelimit.too_many(f"login-ip:{ip}", max_hits=20, window_seconds=900)
+            or ratelimit.too_many(f"login-email:{email.strip().lower()}", max_hits=10, window_seconds=900)):
+        raise HTTPException(status_code=429, detail="Too many login attempts. Please wait a few minutes and try again.")
     try:
         # Auth client only — keep supabase_admin pinned to service_role.
         result = supabase_auth.auth.sign_in_with_password({"email": email, "password": password})

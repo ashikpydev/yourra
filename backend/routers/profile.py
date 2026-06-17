@@ -33,6 +33,7 @@ async def get_jobs(user=Depends(get_current_user)):
                 "credits_used, model_used, created_at, completed_at")
         .eq("user_id", user["_auth_user_id"])
         .order("created_at", desc=True)
+        .limit(50)  # bounded payload — this endpoint is polled frequently
         .execute()
     )
     return result.data

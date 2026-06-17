@@ -10,9 +10,10 @@ Mounts:
 import uuid
 
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.auth import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user
 from backend.config import settings
@@ -32,6 +33,30 @@ app.include_router(auth_router.router)
 app.include_router(profile.router)
 app.include_router(transcription.router)
 app.include_router(admin.router)
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    """Baseline security headers (cheap, no behaviour change)."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _auth_redirect_handler(request: Request, exc: StarletteHTTPException):
+    """Safety net: a browser hitting a protected PAGE with an expired session
+    should land on /login, never see a raw JSON 401/403. API and admin routes
+    keep their normal JSON/Basic-Auth behaviour so the frontend can react."""
+    if (exc.status_code in (401, 403)
+            and request.method == "GET"
+            and not request.url.path.startswith("/api")
+            and not request.url.path.startswith("/admin")):
+        return RedirectResponse(url="/login")
+    headers = getattr(exc, "headers", None)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=headers)
 
 
 @app.middleware("http")

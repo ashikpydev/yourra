@@ -116,6 +116,13 @@ async def get_current_user(request: Request) -> dict:
 
 def require_admin(credentials: HTTPBasicCredentials = Depends(basic_auth)) -> str:
     """HTTP Basic Auth gate for /admin/* routes."""
+    # Fail closed: if the admin password isn't configured, NEVER authenticate.
+    # Otherwise a blank/default password would expose the whole admin panel.
+    if not settings.ADMIN_PASSWORD or not settings.ADMIN_USERNAME:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin panel is not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD.",
+        )
     correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
     correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
     if not (correct_username and correct_password):
