@@ -174,12 +174,17 @@ function resultPage() {
         const line = raw.trim();
         if (!line) return;
         let t = null, tsTag = null, rest = line;
-        const m = line.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$/);
+        // Tolerant timestamp match: accepts [M:SS] and [H:MM:SS], and also
+        // sloppy model output with stray spaces or unpadded fields such as
+        // "[0: 1:02]" — these used to fall through and stay unlinked in the body.
+        const m = line.match(/^\[\s*(\d{1,2})\s*:\s*(\d{1,2})(?:\s*:\s*(\d{1,2}))?\s*\]\s*(.*)$/);
         if (m) {
-          tsTag = m[1];
-          const p = tsTag.split(':').map(n => parseInt(n));
-          t = p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1];
-          rest = m[2];
+          let h, mi, se;
+          if (m[3] !== undefined) { h = +m[1]; mi = +m[2]; se = +m[3]; }
+          else { h = 0; mi = +m[1]; se = +m[2]; }
+          t = h * 3600 + mi * 60 + se;
+          tsTag = this.fmt(t);   // normalize so edited/saved text is consistent
+          rest = m[4];
         }
         let label = '', body = rest;
         const ci = rest.indexOf(':');
