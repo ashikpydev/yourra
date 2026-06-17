@@ -1,7 +1,7 @@
 {% extends "admin/base.html" %}
 {% block content %}
 <h1 class="text-2xl font-extrabold mb-2">Trial requests</h1>
-<p class="text-xs muted mb-6">People who asked for a trial. To grant access, use <strong>Users → Add a user</strong> (or "Manually activate credits" if they already have an account).</p>
+<p class="text-xs muted mb-6">People who asked for a trial. To grant access, use <strong>Users, then Add a user</strong> (or "Manually activate credits" if they already have an account).</p>
 
 <div class="card overflow-x-auto">
   <table class="min-w-full text-sm">
@@ -19,8 +19,8 @@
       <tr class="border-b border-slate-50 last:border-0 align-top">
         <td class="px-4 py-3 font-medium text-slate-700">{{ t.full_name }}</td>
         <td class="px-4 py-3">{{ t.email }}</td>
-        <td class="px-4 py-3 muted">{{ t.organization or "—" }}</td>
-        <td class="px-4 py-3 muted max-w-md">{{ t.purpose or "—" }}</td>
+        <td class="px-4 py-3 muted">{{ t.organization or "-" }}</td>
+        <td class="px-4 py-3 muted max-w-md">{{ t.purpose or "-" }}</td>
         <td class="px-4 py-3 muted whitespace-nowrap">{{ t.created_at }}</td>
       </tr>
       {% else %}

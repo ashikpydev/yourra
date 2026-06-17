@@ -30,7 +30,7 @@
       <!-- Upload -->
       <div class="card card-pad">
         <h2 class="font-display font-bold mb-1">Upload audio for transcription</h2>
-        <p class="text-xs muted mb-1">MP3, WAV, M4A, OGG or MP4, up to {{ max_upload_mb }}MB. Any language in — Bangla + English out, with speaker labels.</p>
+        <p class="text-xs muted mb-1">MP3, WAV, M4A, OGG or MP4, up to {{ max_upload_mb }}MB. Any language in, Bangla and English out, with speaker labels.</p>
         <p class="text-xs mb-4"><span class="font-semibold text-indigo-700" x-text="profile.credits_minutes + ' minutes remaining'"></span><span class="muted">. Only your remaining minutes are transcribed; a longer file is trimmed to that length.</span></p>
         <form @submit.prevent="upload">
           <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-xl py-8 px-4 cursor-pointer hover:border-indigo-400 transition"
@@ -69,7 +69,7 @@
               <option value="5">5 days</option>
               <option value="7">7 days (maximum)</option>
             </select>
-            <p class="text-xs muted mt-1">Your uploaded audio is automatically and permanently deleted after this many days. Your transcript stays in your account until you delete it. <a href="/privacy" class="text-indigo-600 font-medium">How we protect your data →</a></p>
+            <p class="text-xs muted mt-1">Your uploaded audio is permanently deleted after this many days. Your transcript stays in your account until you delete it. <a href="/privacy" class="text-indigo-600 font-medium">How we protect your data</a></p>
           </div>
 
           <div class="mt-4">
@@ -101,7 +101,7 @@
           <p x-show="estReady && !uploading" x-cloak class="text-sm mt-4"
              :class="estMin > profile.credits_minutes ? 'text-amber-600' : 'muted'">
             <template x-if="estMin <= profile.credits_minutes">
-              <span>This file is about <strong x-text="estMin"></strong> min. You have <span x-text="profile.credits_minutes"></span> min — about <strong x-text="Math.max(0, profile.credits_minutes - estMin)"></strong> min will remain after.</span>
+              <span>This file is about <strong x-text="estMin"></strong> min. You have <span x-text="profile.credits_minutes"></span> min, leaving about <strong x-text="Math.max(0, profile.credits_minutes - estMin)"></strong> min after.</span>
             </template>
             <template x-if="estMin > profile.credits_minutes">
               <span>This file is about <strong x-text="estMin"></strong> min, but you have only <strong x-text="profile.credits_minutes"></strong> min. Only the first <span x-text="profile.credits_minutes"></span> min will be transcribed.</span>
@@ -128,11 +128,11 @@
         </form>
         <div class="mt-4 flex items-start gap-2 rounded-lg p-3 text-xs" style="background:var(--brand-50);color:var(--ink-700)">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0 mt-0.5 text-indigo-600"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 11v5M12 7.5h.01"/></svg>
-          <span><strong>Accuracy note:</strong> Output quality depends on your audio. On clear recordings with little background noise and one person speaking at a time, YourRA reaches up to about 90&ndash;95% accuracy. Heavy noise, echo, or overlapping speech lowers this. We recommend a quick review before final use.</span>
+          <span><strong>Accuracy note:</strong> Output quality depends on your audio. On clear recordings with little background noise and one person speaking at a time, YourRA reaches up to about 90 to 95 percent accuracy. Heavy noise, echo, or overlapping speech lowers this. We recommend a quick review before final use.</span>
         </div>
         <div class="mt-3 flex items-start gap-2 rounded-lg p-3 text-xs" style="background:#ecfdf5;color:#065f46">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0 mt-0.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V7l7-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12.5l1.8 1.8 3.2-3.6"/></svg>
-          <span><strong>Your data is protected:</strong> encrypted transfer &amp; storage, private to your account, never used to train AI, and your audio is auto-deleted on the schedule you choose. <a href="/privacy" class="font-semibold underline">Read our privacy &amp; ethics commitments →</a></span>
+          <span><strong>Your data is protected:</strong> encrypted transfer and storage, private to your account, never used to train AI, and your audio is deleted automatically on the schedule you choose. <a href="/privacy" class="font-semibold underline">Read our privacy and ethics commitments</a>.</span>
         </div>
       </div>
 

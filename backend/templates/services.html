@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}RA Services — YourRA{% endblock %}
+{% block title %}RA Services | YourRA{% endblock %}
 {% block content %}
 <section class="hero-bg border-b border-slate-200">
   <div class="container-page py-16 text-center">
@@ -14,7 +14,7 @@
     {% set svc = [
       ('SurveyCTO Setup','Form design, programming, skip logic, validation, testing, and deployment on SurveyCTO.'),
       ('Data Processing','Cleaning, validation, recoding, and merging datasets across sources and survey rounds.'),
-      ('Data Analysis','Descriptive &amp; inferential analysis in Stata, R, SPSS, or Excel — with tables and visualizations.'),
+      ('Data Analysis','Descriptive and inferential analysis in Stata, R, SPSS, or Excel, with tables and visualizations.'),
       ('Research Manuscript Writing','Drafting, editing, and formatting reports, papers, and manuscripts for submission.')
     ] %}
     {% for title, desc in svc %}
@@ -32,7 +32,7 @@
 
   {% if request.query_params.get('submitted') %}
   <div class="max-w-2xl mx-auto mb-6 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-3 text-center text-sm">
-    ✓ Thanks! Your request has been submitted. We'll contact you shortly with a quote.
+    Thank you. Your request has been submitted, and we'll contact you shortly with a quote.
   </div>
   {% endif %}
 
@@ -51,7 +51,7 @@
       </div>
       <div>
         <label class="label">Description</label>
-        <textarea name="description" rows="4" class="field" placeholder="Briefly describe your project — sample size, variables, deliverables, etc."></textarea>
+        <textarea name="description" rows="4" class="field" placeholder="Briefly describe your project: sample size, variables, deliverables, and so on."></textarea>
       </div>
       <div class="grid sm:grid-cols-2 gap-4">
         <div>

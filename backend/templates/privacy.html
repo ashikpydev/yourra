@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Privacy, Security & Research Ethics — YourRA{% endblock %}
+{% block title %}Privacy, Security and Research Ethics | YourRA{% endblock %}
 {% block content %}
 <section class="container-page py-12 max-w-3xl">
 
@@ -14,20 +14,20 @@
   <!-- Quick promises -->
   <div class="grid sm:grid-cols-2 gap-4 mt-8">
     <div class="card card-pad">
-      <h3 class="font-display font-bold">🔒 Encrypted end to end of transfer</h3>
-      <p class="muted text-sm mt-1">All uploads and downloads travel over HTTPS/TLS, and files are stored encrypted at rest.</p>
+      <h3 class="font-display font-bold">Encrypted in transit and at rest</h3>
+      <p class="muted text-sm mt-1">All uploads and downloads travel over HTTPS, and files are stored encrypted at rest.</p>
     </div>
     <div class="card card-pad">
-      <h3 class="font-display font-bold">🧠 Never used to train AI</h3>
+      <h3 class="font-display font-bold">Never used to train AI</h3>
       <p class="muted text-sm mt-1">We use Google Gemini on a <strong>paid tier</strong>. Under Google's paid API terms, your audio and transcripts are <strong>not used to train AI models</strong> and are not reviewed for product improvement.</p>
     </div>
     <div class="card card-pad">
-      <h3 class="font-display font-bold">🗑️ You choose how long audio is kept</h3>
-      <p class="muted text-sm mt-1">Pick 1–{{ retention_days }} days at upload. Your audio is automatically deleted after that. Transcripts stay until <em>you</em> delete them.</p>
+      <h3 class="font-display font-bold">You choose how long audio is kept</h3>
+      <p class="muted text-sm mt-1">Choose from one to {{ retention_days }} days at upload. Your audio is deleted automatically after that. Transcripts remain until <em>you</em> delete them.</p>
     </div>
     <div class="card card-pad">
-      <h3 class="font-display font-bold">👤 Private to your account</h3>
-      <p class="muted text-sm mt-1">Only you can see your files and transcripts in the app. You can permanently delete any job — audio and transcript — at any time.</p>
+      <h3 class="font-display font-bold">Private to your account</h3>
+      <p class="muted text-sm mt-1">Only you can see your files and transcripts in the app, and you can permanently delete any job, including both the audio and the transcript, at any time.</p>
     </div>
   </div>
 
@@ -48,10 +48,10 @@
       <h2 class="text-xl font-bold mb-2">Who processes your data (sub-processors)</h2>
       <p class="muted text-sm mb-2">We use a small number of trusted infrastructure providers, each only for the role listed:</p>
       <ul class="list-disc list-inside muted text-sm space-y-1">
-        <li><strong>Google (Gemini API, paid tier)</strong> — transcription &amp; translation. Paid-tier data is not used for model training.</li>
-        <li><strong>Cloudflare R2</strong> — encrypted storage of your audio during the retention window.</li>
-        <li><strong>Supabase</strong> — account, authentication, and transcript database (encrypted at rest).</li>
-        <li><strong>Railway</strong> — application hosting (HTTPS).</li>
+        <li><strong>Google (Gemini API, paid tier):</strong> transcription and translation. Paid-tier data is not used for model training.</li>
+        <li><strong>Cloudflare R2:</strong> encrypted storage of your audio during the retention window.</li>
+        <li><strong>Supabase:</strong> account, authentication, and transcript database, encrypted at rest.</li>
+        <li><strong>Railway:</strong> application hosting over HTTPS.</li>
       </ul>
     </div>
 
@@ -60,16 +60,16 @@
       <p class="muted text-sm">
         Your recordings and transcripts are private to your account and not shared with other users.
         A small number of our operators can access infrastructure when strictly necessary to run the
-        service or help you with support — they are bound to keep your data confidential and never use
+        service or help you with support. They are bound to keep your data confidential and never use
         it for any other purpose. We never sell your data, and we never share it with third parties
         except the sub-processors above that make the service work.
       </p>
     </div>
 
     <div>
-      <h2 class="text-xl font-bold mb-2">Retention &amp; deletion — your control</h2>
+      <h2 class="text-xl font-bold mb-2">Retention and deletion: your control</h2>
       <ul class="list-disc list-inside muted text-sm space-y-1">
-        <li><strong>Audio:</strong> auto-deleted after the 1–{{ retention_days }} days you select at upload.</li>
+        <li><strong>Audio:</strong> deleted automatically after the one to {{ retention_days }} days you select at upload.</li>
         <li><strong>Transcripts:</strong> kept in your account until you delete them.</li>
         <li><strong>Delete anytime:</strong> the Delete button on any job permanently removes both the audio and the transcript.</li>
         <li><strong>Account closure:</strong> contact us to erase your account and all associated data.</li>
@@ -92,7 +92,7 @@
     <div>
       <h2 class="text-xl font-bold mb-2">Questions or data requests</h2>
       <p class="muted text-sm">
-        For any privacy, deletion, or data-handling question — including ethics-board documentation —
+        For any privacy, deletion, or data-handling question, including documentation for your ethics board,
         reach us
         {% if whatsapp_number %}on <a class="text-indigo-600 font-medium" href="https://wa.me/88{{ whatsapp_number }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
         and we'll help promptly.

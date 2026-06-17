@@ -21,9 +21,9 @@
         <td class="px-4 py-3">{{ j.email }}</td>
         <td class="px-4 py-3 text-slate-700 max-w-[180px] truncate">{{ j.original_filename }}</td>
         <td class="px-4 py-3"><span class="badge {{ badges.get(j.status, 'badge-gray') }}">{{ j.status }}</span></td>
-        <td class="px-4 py-3 muted">{{ j.duration_minutes or "—" }}</td>
-        <td class="px-4 py-3 muted">{{ j.credits_used or "—" }}</td>
-        <td class="px-4 py-3 uppercase text-xs">{{ j.model_used or "—" }}</td>
+        <td class="px-4 py-3 muted">{{ j.duration_minutes or "-" }}</td>
+        <td class="px-4 py-3 muted">{{ j.credits_used or "-" }}</td>
+        <td class="px-4 py-3 uppercase text-xs">{{ j.model_used or "-" }}</td>
         <td class="px-4 py-3 muted">{{ j.created_at }}</td>
       </tr>
       {% else %}
