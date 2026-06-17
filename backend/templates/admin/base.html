@@ -22,6 +22,9 @@
       <a href="{{ href }}" class="px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/10 hover:text-white whitespace-nowrap {% if request.url.path == href %}bg-white/10 text-white{% endif %}">{{ label }}</a>
       {% endfor %}
       <a href="/" class="ml-auto text-sm text-slate-400 hover:text-white whitespace-nowrap">View site</a>
+      <form action="/admin/logout" method="post" class="ml-3">
+        <button type="submit" class="text-sm text-slate-400 hover:text-white whitespace-nowrap">Log out</button>
+      </form>
     </div>
   </nav>
   <main class="container-page py-8">

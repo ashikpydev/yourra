@@ -15,7 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.auth import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user
+from backend.auth import (ACCESS_COOKIE, REFRESH_COOKIE, ADMIN_COOKIE,
+                          get_current_user, create_admin_session, revoke_admin_session)
 from backend.config import settings
 from backend.database import supabase_admin
 from backend.routers import auth_router, profile, transcription, admin
@@ -47,14 +48,12 @@ async def _security_headers(request: Request, call_next):
 
 @app.exception_handler(StarletteHTTPException)
 async def _auth_redirect_handler(request: Request, exc: StarletteHTTPException):
-    """Safety net: a browser hitting a protected PAGE with an expired session
-    should land on /login, never see a raw JSON 401/403. API and admin routes
-    keep their normal JSON/Basic-Auth behaviour so the frontend can react."""
-    if (exc.status_code in (401, 403)
-            and request.method == "GET"
-            and not request.url.path.startswith("/api")
-            and not request.url.path.startswith("/admin")):
-        return RedirectResponse(url="/login")
+    """Safety net: protected pages redirect to the right login on 401/403."""
+    if exc.status_code in (401, 403) and request.method == "GET":
+        if request.url.path.startswith("/admin"):
+            return RedirectResponse(url="/admin/login")
+        if not request.url.path.startswith("/api"):
+            return RedirectResponse(url="/login")
     headers = getattr(exc, "headers", None)
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=headers)
 
@@ -252,6 +251,48 @@ async def privacy(request: Request):
         "privacy.html",
         {"request": request, "user": user, "retention_days": settings.R2_RETENTION_DAYS},
     )
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    return templates.TemplateResponse("admin/login.html", {"request": request})
+
+
+@app.post("/admin/login")
+async def admin_login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    from backend.config import settings as s
+    import secrets as _s
+    valid = (
+        s.ADMIN_USERNAME and s.ADMIN_PASSWORD
+        and _s.compare_digest(username, s.ADMIN_USERNAME)
+        and _s.compare_digest(password, s.ADMIN_PASSWORD)
+    )
+    if not valid:
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": "Invalid username or password."},
+            status_code=401,
+        )
+    token = create_admin_session()
+    resp = RedirectResponse(url="/admin", status_code=303)
+    resp.set_cookie(
+        ADMIN_COOKIE, token, httponly=True,
+        secure=settings.COOKIE_SECURE, samesite="strict", max_age=28800,
+    )
+    return resp
+
+
+@app.post("/admin/logout")
+async def admin_logout(request: Request):
+    token = request.cookies.get(ADMIN_COOKIE)
+    revoke_admin_session(token)
+    resp = RedirectResponse(url="/admin/login", status_code=303)
+    resp.delete_cookie(ADMIN_COOKIE)
+    return resp
 
 
 @app.get("/profile", response_class=HTMLResponse)

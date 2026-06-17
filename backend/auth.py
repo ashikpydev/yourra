@@ -11,6 +11,7 @@ Auth helpers.
 - require_admin: HTTP Basic Auth dependency for /admin/* routes.
 """
 import secrets
+import time
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -22,6 +23,37 @@ basic_auth = HTTPBasic()
 
 ACCESS_COOKIE = "sb_access_token"
 REFRESH_COOKIE = "sb_refresh_token"
+ADMIN_COOKIE = "ya_admin_session"
+
+# In-memory admin sessions {token: expiry_unix}
+_admin_sessions: dict[str, float] = {}
+_ADMIN_SESSION_TTL = 8 * 3600  # 8 hours
+
+
+def create_admin_session() -> str:
+    token = secrets.token_urlsafe(32)
+    now = time.time()
+    _admin_sessions[token] = now + _ADMIN_SESSION_TTL
+    # Prune expired entries
+    expired = [k for k, v in list(_admin_sessions.items()) if v < now]
+    for k in expired:
+        _admin_sessions.pop(k, None)
+    return token
+
+
+def verify_admin_session(token: str | None) -> bool:
+    if not token:
+        return False
+    expiry = _admin_sessions.get(token)
+    if not expiry or expiry < time.time():
+        _admin_sessions.pop(token, None)
+        return False
+    return True
+
+
+def revoke_admin_session(token: str | None):
+    if token:
+        _admin_sessions.pop(token, None)
 
 
 def _extract_token(request: Request) -> str | None:
@@ -114,21 +146,13 @@ async def get_current_user(request: Request) -> dict:
     return profile
 
 
-def require_admin(credentials: HTTPBasicCredentials = Depends(basic_auth)) -> str:
-    """HTTP Basic Auth gate for /admin/* routes."""
-    # Fail closed: if the admin password isn't configured, NEVER authenticate.
-    # Otherwise a blank/default password would expose the whole admin panel.
+async def require_admin(request: Request):
+    """Session-cookie gate for /admin/* routes. Redirects to /admin/login if not authenticated."""
     if not settings.ADMIN_PASSWORD or not settings.ADMIN_USERNAME:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Admin panel is not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD.",
         )
-    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
-    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
-    if not (correct_username and correct_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid admin credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+    token = request.cookies.get(ADMIN_COOKIE)
+    if not verify_admin_session(token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin login required")
