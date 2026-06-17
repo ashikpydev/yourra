@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from backend.auth import get_current_user
+from backend.auth import ACCESS_COOKIE, REFRESH_COOKIE, get_current_user
 from backend.config import settings
 from backend.database import supabase_admin
 from backend.routers import auth_router, profile, transcription, admin
@@ -32,6 +32,26 @@ app.include_router(auth_router.router)
 app.include_router(profile.router)
 app.include_router(transcription.router)
 app.include_router(admin.router)
+
+
+@app.middleware("http")
+async def _refresh_session_cookies(request: Request, call_next):
+    """If get_current_user renewed an expired access token during the request,
+    write the new tokens back to the browser so the session stays alive."""
+    response = await call_next(request)
+    tokens = getattr(request.state, "refreshed_tokens", None)
+    if tokens:
+        access, refresh = tokens
+        response.set_cookie(
+            ACCESS_COOKIE, access, httponly=True,
+            secure=settings.COOKIE_SECURE, samesite="lax", max_age=604800,
+        )
+        if refresh:
+            response.set_cookie(
+                REFRESH_COOKIE, refresh, httponly=True,
+                secure=settings.COOKIE_SECURE, samesite="lax", max_age=2592000,
+            )
+    return response
 
 
 async def get_optional_user(request: Request):
@@ -66,7 +86,12 @@ async def signup_page(request: Request):
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, user=Depends(get_current_user)):
+async def dashboard(request: Request):
+    user = await get_optional_user(request)
+    if not user:
+        # Session missing/expired and not refreshable — send to login, never
+        # dump a raw JSON 401 to the browser.
+        return RedirectResponse(url="/login")
     # Best-effort housekeeping for this user (fire-and-forget, off the request
     # path): clear expired review audio, and recover any jobs left stuck by a
     # server restart so they can be retried.
@@ -102,7 +127,10 @@ async def dashboard(request: Request, user=Depends(get_current_user)):
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-async def job_result_page(request: Request, job_id: str, user=Depends(get_current_user)):
+async def job_result_page(request: Request, job_id: str):
+    user = await get_optional_user(request)
+    if not user:
+        return RedirectResponse(url="/login")
     result = (
         supabase_admin.table("transcription_jobs")
         .select("*")

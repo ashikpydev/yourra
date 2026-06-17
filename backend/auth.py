@@ -1,9 +1,13 @@
 """
 Auth helpers.
 
-- get_current_user: FastAPI dependency that validates the Supabase JWT
-  passed either as an httpOnly cookie ("sb_access_token") or an
-  Authorization: Bearer header, and returns the user's profile row.
+- get_current_user: FastAPI dependency that validates the Supabase JWT passed
+  as an httpOnly cookie ("sb_access_token") or an Authorization: Bearer header,
+  and returns the user's profile row. If the access token has expired but a
+  valid refresh token cookie ("sb_refresh_token") is present, it transparently
+  refreshes the session and stashes the new tokens on request.state so a
+  middleware can re-set the cookies — keeping users logged in for the full
+  cookie lifetime instead of just the ~1 hour access-token window.
 - require_admin: HTTP Basic Auth dependency for /admin/* routes.
 """
 import secrets
@@ -16,33 +20,71 @@ from backend.database import supabase_admin, supabase_auth
 
 basic_auth = HTTPBasic()
 
+ACCESS_COOKIE = "sb_access_token"
+REFRESH_COOKIE = "sb_refresh_token"
+
 
 def _extract_token(request: Request) -> str | None:
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.lower().startswith("bearer "):
         return auth_header.split(" ", 1)[1]
-    return request.cookies.get("sb_access_token")
+    return request.cookies.get(ACCESS_COOKIE)
+
+
+def _verify_token(token: str | None):
+    """Return the auth user for a valid access token, else None."""
+    if not token:
+        return None
+    try:
+        resp = supabase_auth.auth.get_user(token)
+        return getattr(resp, "user", None)
+    except Exception:
+        return None
+
+
+def _try_refresh(request: Request):
+    """If the access token is dead but a refresh token cookie is valid, mint a
+    new session. Returns (user, access_token, refresh_token) or None.
+
+    Skipped in LOCAL_MODE (the local shim's tokens don't expire) and guarded so
+    any failure simply means 'not authenticated' rather than a crash."""
+    if settings.LOCAL_MODE:
+        return None
+    refresh = request.cookies.get(REFRESH_COOKIE)
+    if not refresh:
+        return None
+    try:
+        res = supabase_auth.auth.refresh_session(refresh)
+        session = getattr(res, "session", None)
+        user = getattr(res, "user", None) or (getattr(session, "user", None) if session else None)
+        if session and user and getattr(session, "access_token", None):
+            return user, session.access_token, session.refresh_token
+    except Exception:
+        return None
+    return None
 
 
 async def get_current_user(request: Request) -> dict:
     """
-    Validate the Supabase JWT and return the user's profile row
-    (from user_profiles), creating it on first login if missing.
+    Validate the session and return the user's profile row (from user_profiles),
+    creating it on first login if missing. Refreshes an expired access token
+    when possible.
     """
     token = _extract_token(request)
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+    user = _verify_token(token)
+    access_token = token
 
-    try:
-        # Verify on the dedicated auth client so the service-role data client
-        # (supabase_admin) is never re-authed/downgraded to this user.
-        user_resp = supabase_auth.auth.get_user(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
-
-    user = getattr(user_resp, "user", None)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    if user is None:
+        refreshed = _try_refresh(request)
+        if refreshed:
+            user, access_token, new_refresh = refreshed
+            # Hand the new tokens to the cookie-refresh middleware (main.py).
+            request.state.refreshed_tokens = (access_token, new_refresh)
+        else:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired session" if token else "Not authenticated",
+            )
 
     # Ensure a user_profiles row exists (created on first authenticated request
     # after email verification).
@@ -68,7 +110,7 @@ async def get_current_user(request: Request) -> dict:
         profile = inserted.data[0]
 
     profile["_auth_user_id"] = user.id
-    profile["_access_token"] = token
+    profile["_access_token"] = access_token
     return profile
 
 

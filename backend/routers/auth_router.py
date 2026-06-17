@@ -4,13 +4,15 @@ Auth routes: signup, login, logout.
 from fastapi import APIRouter, Request, Response, Form, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 
+from backend.auth import ACCESS_COOKIE, REFRESH_COOKIE
 from backend.config import settings
 from backend.database import supabase_admin, supabase_auth
 from backend.services.trial import is_disposable_email
 
 router = APIRouter(tags=["auth"])
 
-COOKIE_NAME = "sb_access_token"
+# Kept for backwards reference; the canonical names live in backend.auth.
+COOKIE_NAME = ACCESS_COOKIE
 
 
 @router.post("/signup")
@@ -67,6 +69,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
         raise HTTPException(status_code=401, detail="Wrong email or password, or email not verified.")
 
     access_token = result.session.access_token
+    refresh_token = getattr(result.session, "refresh_token", None)
     user_id = result.user.id
 
     existing = supabase_admin.table("user_profiles").select("*").eq("id", user_id).execute()
@@ -79,14 +82,22 @@ async def login(email: str = Form(...), password: str = Form(...)):
 
     resp = JSONResponse({"ok": True})
     resp.set_cookie(
-        key=COOKIE_NAME, value=access_token, httponly=True,
+        key=ACCESS_COOKIE, value=access_token, httponly=True,
         secure=settings.COOKIE_SECURE, samesite="lax", max_age=604800,
     )
+    # Refresh token lets us silently renew the (short-lived) access token so the
+    # user isn't logged out after ~1 hour. Kept longer than the access cookie.
+    if refresh_token:
+        resp.set_cookie(
+            key=REFRESH_COOKIE, value=refresh_token, httponly=True,
+            secure=settings.COOKIE_SECURE, samesite="lax", max_age=2592000,  # 30 days
+        )
     return resp
 
 
 @router.post("/logout")
 async def logout():
     redirect = RedirectResponse(url="/login", status_code=303)
-    redirect.delete_cookie(COOKIE_NAME)
+    redirect.delete_cookie(ACCESS_COOKIE)
+    redirect.delete_cookie(REFRESH_COOKIE)
     return redirect
