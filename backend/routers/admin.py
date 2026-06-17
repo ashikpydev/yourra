@@ -44,6 +44,13 @@ async def admin_index(request: Request):
     new_requests = (
         supabase_admin.table("service_requests").select("id", count="exact").eq("status", "new").execute()
     )
+    pending_trials = (
+        supabase_admin.table("trial_requests").select("id", count="exact").eq("status", "new").execute()
+    )
+    active_jobs = (
+        supabase_admin.table("transcription_jobs").select("id", count="exact")
+        .in_("status", ["pending", "processing", "merging"]).execute()
+    )
 
     return templates.TemplateResponse(
         "admin/index.html",
@@ -51,9 +58,11 @@ async def admin_index(request: Request):
             "request": request,
             "total_users": users.count or 0,
             "total_jobs": jobs.count or 0,
-            "minutes_today": minutes_today,
+            "minutes_today": round(minutes_today or 0, 1),
             "pending_payments": pending_payments.count or 0,
             "new_requests": new_requests.count or 0,
+            "pending_trials": pending_trials.count or 0,
+            "active_jobs": active_jobs.count or 0,
         },
     )
 
@@ -62,7 +71,7 @@ async def admin_index(request: Request):
 async def admin_users(request: Request):
     users = (
         supabase_admin.table("user_profiles")
-        .select("email, credits_minutes, is_active, created_at")
+        .select("id, email, full_name, organization, credits_minutes, is_active, created_at")
         .order("created_at", desc=True)
         .execute()
     )
@@ -260,6 +269,50 @@ async def admin_requests(request: Request):
     return templates.TemplateResponse("admin/requests.html", {"request": request, "requests": requests_.data})
 
 
+@router.post("/requests/{request_id}/update")
+async def update_request(request_id: str, status: str = Form(...), quoted_price: str = Form(""), admin_notes: str = Form("")):
+    supabase_admin.table("service_requests").update(
+        {"status": status, "quoted_price": quoted_price, "admin_notes": admin_notes}
+    ).eq("id", request_id).execute()
+    return RedirectResponse(url="/admin/requests", status_code=303)
+
+
+@router.post("/activate")
+async def manual_activate(email: str = Form(...), minutes: int = Form(...), bkash_ref: str = Form(""), notes: str = Form("")):
+    profile = supabase_admin.table("user_profiles").select("id, credits_minutes").eq("email", email).execute()
+    if not profile.data:
+        return RedirectResponse(url="/admin/users?msg=User+not+found", status_code=303)
+
+    p = profile.data[0]
+    supabase_admin.table("user_profiles").update(
+        {"credits_minutes": (p["credits_minutes"] or 0) + minutes}
+    ).eq("id", p["id"]).execute()
+
+    supabase_admin.table("credit_transactions").insert(
+        {"user_id": p["id"], "minutes_added": minutes, "transaction_type": "manual_bkash",
+         "bkash_reference": bkash_ref, "notes": notes, "activated_by": "admin"}
+    ).execute()
+
+    return RedirectResponse(url=f"/admin/users?msg=Added+{minutes}+min+to+{email}", status_code=303)
+
+
+@router.post("/users/add-credits")
+async def admin_add_credits(email: str = Form(...), minutes: int = Form(...)):
+    """Inline credit top-up from the users table row."""
+    profile = supabase_admin.table("user_profiles").select("id, credits_minutes").eq("email", email).execute()
+    if not profile.data:
+        return RedirectResponse(url="/admin/users?msg=User+not+found", status_code=303)
+    p = profile.data[0]
+    supabase_admin.table("user_profiles").update(
+        {"credits_minutes": (p["credits_minutes"] or 0) + minutes}
+    ).eq("id", p["id"]).execute()
+    supabase_admin.table("credit_transactions").insert(
+        {"user_id": p["id"], "minutes_added": minutes, "transaction_type": "manual_bkash",
+         "notes": "Admin top-up", "activated_by": "admin"}
+    ).execute()
+    return RedirectResponse(url=f"/admin/users?msg=Added+{minutes}+min+to+{email}", status_code=303)
+
+
 @router.get("/trials")
 async def admin_trials(request: Request):
     rows = (
@@ -271,36 +324,67 @@ async def admin_trials(request: Request):
     return templates.TemplateResponse("admin/trials.html", {"request": request, "trials": rows.data})
 
 
-@router.post("/requests/{request_id}/update")
-async def update_request(request_id: str, status: str = Form(...), quoted_price: str = Form(""), admin_notes: str = Form("")):
-    supabase_admin.table("service_requests").update(
-        {"status": status, "quoted_price": quoted_price, "admin_notes": admin_notes}
-    ).eq("id", request_id).execute()
-    return RedirectResponse(url="/admin/requests", status_code=303)
+@router.post("/trials/{trial_id}/grant")
+async def grant_trial(trial_id: str, minutes: int = Form(60)):
+    """Invite the trial requester and grant them starting credits."""
+    row = supabase_admin.table("trial_requests").select("*").eq("id", trial_id).execute()
+    if not row.data:
+        return RedirectResponse(url="/admin/trials?msg=Not+found", status_code=303)
+    t = row.data[0]
+    email = t.get("email", "").strip().lower()
+    if not email:
+        return RedirectResponse(url="/admin/trials?msg=No+email+on+request", status_code=303)
+
+    # Invite or find existing user
+    try:
+        if settings.LOCAL_MODE:
+            pw = secrets.token_urlsafe(12)
+            result = supabase_auth.auth.sign_up({"email": email, "password": pw})
+        else:
+            redirect_url = settings.APP_BASE_URL.rstrip("/") + "/reset-password"
+            result = supabase_admin.auth.admin.invite_user_by_email(
+                email, {"redirect_to": redirect_url}
+            )
+        uid = getattr(getattr(result, "user", None), "id", None)
+    except Exception:
+        # User may already exist — look up by email
+        existing_auth = supabase_admin.table("user_profiles").select("id, credits_minutes").eq("email", email).execute()
+        if existing_auth.data:
+            uid = existing_auth.data[0]["id"]
+        else:
+            return RedirectResponse(url="/admin/trials?msg=Failed+to+create+account", status_code=303)
+
+    if uid:
+        existing = supabase_admin.table("user_profiles").select("id, credits_minutes").eq("id", uid).execute()
+        if not existing.data:
+            supabase_admin.table("user_profiles").insert(
+                {"id": uid, "email": email, "full_name": t.get("full_name"),
+                 "organization": t.get("organization"), "credits_minutes": int(minutes),
+                 "trial_used": True, "is_active": 1}
+            ).execute()
+        else:
+            cur = existing.data[0].get("credits_minutes", 0) or 0
+            supabase_admin.table("user_profiles").update(
+                {"credits_minutes": cur + int(minutes)}
+            ).eq("id", uid).execute()
+        supabase_admin.table("credit_transactions").insert(
+            {"user_id": uid, "minutes_added": int(minutes), "transaction_type": "trial",
+             "notes": "Trial granted by admin", "activated_by": "admin"}
+        ).execute()
+
+    supabase_admin.table("trial_requests").update({"status": "granted"}).eq("id", trial_id).execute()
+    return RedirectResponse(url="/admin/trials?msg=Access+granted+to+%s" % email, status_code=303)
 
 
-@router.post("/activate")
-async def manual_activate(email: str = Form(...), minutes: int = Form(...), bkash_ref: str = Form(""), notes: str = Form("")):
-    """Fallback: manually grant credits to a user by email (e.g., for
-    institutional/custom arrangements outside the standard bundles)."""
-    profile = supabase_admin.table("user_profiles").select("id, credits_minutes").eq("email", email).execute()
-    if not profile.data:
-        return RedirectResponse(url="/admin/users", status_code=303)
+@router.post("/trials/{trial_id}/reject")
+async def reject_trial(trial_id: str):
+    supabase_admin.table("trial_requests").update({"status": "rejected"}).eq("id", trial_id).execute()
+    return RedirectResponse(url="/admin/trials?msg=Request+rejected", status_code=303)
 
-    p = profile.data[0]
-    supabase_admin.table("user_profiles").update(
-        {"credits_minutes": p["credits_minutes"] + minutes}
-    ).eq("id", p["id"]).execute()
 
-    supabase_admin.table("credit_transactions").insert(
-        {
-            "user_id": p["id"],
-            "minutes_added": minutes,
-            "transaction_type": "manual_bkash",
-            "bkash_reference": bkash_ref,
-            "notes": notes,
-            "activated_by": "admin",
-        }
-    ).execute()
-
-    return RedirectResponse(url="/admin/users", status_code=303)
+@router.post("/jobs/{job_id}/cancel")
+async def admin_cancel_job(job_id: str):
+    supabase_admin.table("transcription_jobs").update(
+        {"status": "cancelled"}
+    ).eq("id", job_id).execute()
+    return RedirectResponse(url="/admin/jobs", status_code=303)

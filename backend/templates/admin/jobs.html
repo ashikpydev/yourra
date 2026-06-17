@@ -12,22 +12,35 @@
         <th class="px-4 py-3 font-medium">Credits</th>
         <th class="px-4 py-3 font-medium">Model</th>
         <th class="px-4 py-3 font-medium">Created</th>
+        <th class="px-4 py-3 font-medium">Actions</th>
       </tr>
     </thead>
     <tbody>
-      {% set badges = {'completed':'badge-green','failed':'badge-rose','processing':'badge-amber','merging':'badge-amber','pending':'badge-gray'} %}
+      {% set badges = {'completed':'badge-green','failed':'badge-rose','cancelled':'badge-rose','processing':'badge-amber','merging':'badge-amber','pending':'badge-gray'} %}
       {% for j in jobs %}
       <tr class="border-b border-slate-50 last:border-0">
-        <td class="px-4 py-3">{{ j.email }}</td>
-        <td class="px-4 py-3 text-slate-700 max-w-[180px] truncate">{{ j.original_filename }}</td>
-        <td class="px-4 py-3"><span class="badge {{ badges.get(j.status, 'badge-gray') }}">{{ j.status }}</span></td>
-        <td class="px-4 py-3 muted">{{ j.duration_minutes or "-" }}</td>
-        <td class="px-4 py-3 muted">{{ j.credits_used or "-" }}</td>
-        <td class="px-4 py-3 uppercase text-xs">{{ j.model_used or "-" }}</td>
-        <td class="px-4 py-3 muted">{{ j.created_at }}</td>
+        <td class="px-4 py-3 text-xs muted">{{ j.email }}</td>
+        <td class="px-4 py-3 text-slate-700 max-w-[160px] truncate" title="{{ j.original_filename }}">{{ j.original_filename }}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <span class="badge {{ badges.get(j.status, 'badge-gray') }}">{{ j.status }}</span>
+        </td>
+        <td class="px-4 py-3 muted">{{ "%.1f"|format(j.duration_minutes) if j.duration_minutes else "-" }}</td>
+        <td class="px-4 py-3 muted">{{ "%.1f"|format(j.credits_used) if j.credits_used else "-" }}</td>
+        <td class="px-4 py-3 uppercase text-xs muted">{{ j.model_used or "-" }}</td>
+        <td class="px-4 py-3 muted text-xs whitespace-nowrap">{{ j.created_at[:10] if j.created_at else "-" }}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          {% if j.status in ('pending', 'processing', 'merging') %}
+          <form action="/admin/jobs/{{ j.id }}/cancel" method="post" class="inline"
+                onsubmit="return confirm('Cancel this job?')">
+            <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
+          </form>
+          {% else %}
+          <span class="text-xs muted">-</span>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
-      <tr><td class="px-4 py-6 muted text-center" colspan="7">No jobs yet.</td></tr>
+      <tr><td class="px-4 py-6 muted text-center" colspan="8">No jobs yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

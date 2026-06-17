@@ -1,7 +1,8 @@
 {% extends "admin/base.html" %}
 {% block content %}
 <h1 class="text-2xl font-extrabold mb-6">Overview</h1>
-<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
   <div class="card card-pad">
     <div class="text-xs muted font-medium">Total users</div>
     <div class="text-3xl font-extrabold mt-1">{{ total_users }}</div>
@@ -14,19 +15,23 @@
     <div class="text-xs muted font-medium">Minutes today</div>
     <div class="text-3xl font-extrabold mt-1">{{ minutes_today }}</div>
   </div>
+  <div class="card card-pad {% if active_jobs > 0 %}ring-2 ring-indigo-300{% endif %}">
+    <div class="text-xs muted font-medium">Active jobs</div>
+    <div class="text-3xl font-extrabold mt-1 {% if active_jobs > 0 %}text-indigo-600{% endif %}">{{ active_jobs }}</div>
+  </div>
   <a href="/admin/payments" class="card card-pad card-hover {% if pending_payments > 0 %}ring-2 ring-amber-400{% endif %}">
     <div class="text-xs muted font-medium">Pending payments</div>
     <div class="text-3xl font-extrabold mt-1 {% if pending_payments > 0 %}text-amber-600{% endif %}">{{ pending_payments }}</div>
   </a>
-  <a href="/admin/requests" class="card card-pad card-hover {% if new_requests > 0 %}ring-2 ring-indigo-400{% endif %}">
-    <div class="text-xs muted font-medium">New requests</div>
-    <div class="text-3xl font-extrabold mt-1 {% if new_requests > 0 %}text-indigo-600{% endif %}">{{ new_requests }}</div>
+  <a href="/admin/trials" class="card card-pad card-hover {% if pending_trials > 0 %}ring-2 ring-rose-300{% endif %}">
+    <div class="text-xs muted font-medium">Trial requests</div>
+    <div class="text-3xl font-extrabold mt-1 {% if pending_trials > 0 %}text-rose-600{% endif %}">{{ pending_trials }}</div>
   </a>
 </div>
 
-<div class="card card-pad mt-8 max-w-3xl">
-  <h2 class="font-display font-bold mb-1">Manually activate credits</h2>
-  <p class="text-xs muted mb-4">For institutional/custom arrangements, or to correct a balance. Adds minutes to an existing user.</p>
+<div class="card card-pad max-w-3xl">
+  <h2 class="font-display font-bold mb-1">Add credits to existing user</h2>
+  <p class="text-xs muted mb-4">Use this for bKash payments received outside the normal flow, institutional arrangements, or corrections.</p>
   <form action="/admin/activate" method="post" class="flex flex-wrap gap-3 items-end">
     <div>
       <label class="label">User email</label>
@@ -34,7 +39,7 @@
     </div>
     <div>
       <label class="label">Minutes</label>
-      <input type="number" name="minutes" required class="field" style="width:110px">
+      <input type="number" name="minutes" required min="1" class="field" style="width:110px">
     </div>
     <div>
       <label class="label">bKash ref</label>
@@ -44,7 +49,7 @@
       <label class="label">Notes</label>
       <input type="text" name="notes" class="field">
     </div>
-    <button type="submit" class="btn btn-primary">Activate</button>
+    <button type="submit" class="btn btn-primary">Add credits</button>
   </form>
 </div>
 {% endblock %}
