@@ -29,10 +29,10 @@
       <div class="font-mono font-bold text-xl text-indigo-700 tracking-widest">{{ parts[2] }}</div>
     </div>
   </div>
-  <button type="button" onclick="
-    const txt = 'YourRA account details:\nSite: {{ request.url.scheme }}://{{ request.url.netloc }}/login\nEmail: {{ parts[1] }}\nPassword: {{ parts[2] }}\n\nPlease log in and change your password from the Profile page.';
-    navigator.clipboard.writeText(txt).then(() => { this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Copy message for WhatsApp', 2000); });
-  " class="btn btn-primary btn-sm">Copy message for WhatsApp</button>
+  <button type="button" class="btn btn-primary btn-sm js-copy-creds"
+    data-login="{{ request.url.scheme }}://{{ request.url.netloc }}/login"
+    data-email="{{ parts[1] | e }}"
+    data-pw="{{ parts[2] | e }}">Copy message for WhatsApp</button>
 </div>
 {% endif %}
 
@@ -67,8 +67,8 @@
             <input type="number" name="minutes" value="60" min="1" max="999" class="field text-center" style="width:64px;padding:4px 6px;font-size:0.75rem" title="Starting minutes">
             <button type="submit" class="btn btn-primary btn-sm">Grant</button>
           </form>
-          <form action="/admin/trials/{{ t.id }}/reject" method="post" class="inline ml-1"
-                onsubmit="return confirm('Reject request from {{ t.email }}?')">
+          <form action="/admin/trials/{{ t.id }}/reject" method="post" class="inline ml-1 js-confirm-form"
+                data-msg="Reject this trial request?">
             <button type="submit" class="btn btn-danger btn-sm">Reject</button>
           </form>
           {% else %}
@@ -82,4 +82,23 @@
     </tbody>
   </table>
 </div>
+<script>
+document.querySelectorAll('.js-confirm-form').forEach(f => {
+  f.addEventListener('submit', e => {
+    if (!confirm(f.dataset.msg)) e.preventDefault();
+  });
+});
+document.querySelectorAll('.js-copy-creds').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const txt = 'YourRA account details:\nSite: ' + btn.dataset.login +
+      '\nEmail: ' + btn.dataset.email +
+      '\nPassword: ' + btn.dataset.pw +
+      '\n\nPlease log in and change your password from the Profile page.';
+    navigator.clipboard.writeText(txt).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy message for WhatsApp', 2000);
+    });
+  });
+});
+</script>
 {% endblock %}

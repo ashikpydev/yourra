@@ -28,17 +28,17 @@
       <div class="font-mono font-bold text-xl text-indigo-700 tracking-widest">{{ parts[2] }}</div>
     </div>
   </div>
-  <button type="button" onclick="
-    const txt = 'YourRA account details:\nSite: {{ request.url.scheme }}://{{ request.url.netloc }}/login\nEmail: {{ parts[1] }}\nPassword: {{ parts[2] }}\n\nPlease log in and change your password from the Profile page.';
-    navigator.clipboard.writeText(txt).then(() => { this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Copy message for WhatsApp', 2000); });
-  " class="btn btn-primary btn-sm">Copy message for WhatsApp</button>
+  <button type="button" class="btn btn-primary btn-sm js-copy-creds"
+    data-login="{{ request.url.scheme }}://{{ request.url.netloc }}/login"
+    data-email="{{ parts[1] | e }}"
+    data-pw="{{ parts[2] | e }}">Copy message for WhatsApp</button>
 </div>
 {% endif %}
 
 <!-- Add user -->
 <div class="card card-pad mb-6">
   <h2 class="font-display font-bold mb-1">Add a user</h2>
-  <p class="text-xs muted mb-4">Creates a new account and emails the person an invite link so they can set their own password. Supabase sends the invite email for free.</p>
+  <p class="text-xs muted mb-4">Creates the account immediately. A temporary password appears below — copy it and share via WhatsApp. The user can change it from their Profile page.</p>
   <form action="/admin/users/add" method="post" class="flex flex-wrap gap-3 items-end">
     <div>
       <label class="label">Email</label>
@@ -48,7 +48,7 @@
       <label class="label">Starting minutes</label>
       <input type="number" name="minutes" value="0" min="0" class="field" style="width:130px">
     </div>
-    <button type="submit" class="btn btn-primary">Create and email</button>
+    <button type="submit" class="btn btn-primary">Create account</button>
   </form>
 </div>
 
@@ -105,8 +105,8 @@
               <button class="btn btn-secondary btn-sm">Reset pwd</button>
             </form>
 
-            <form action="/admin/users/delete" method="post" class="inline"
-                  onsubmit="return confirm('Delete {{ u.email }} and all their jobs? This cannot be undone.');">
+            <form action="/admin/users/delete" method="post" class="inline js-confirm-form"
+                  data-msg="Delete this user and all their jobs? This cannot be undone.">
               <input type="hidden" name="email" value="{{ u.email }}">
               <button class="btn btn-danger btn-sm">Delete</button>
             </form>
@@ -119,4 +119,23 @@
     </tbody>
   </table>
 </div>
+<script>
+document.querySelectorAll('.js-confirm-form').forEach(f => {
+  f.addEventListener('submit', e => {
+    if (!confirm(f.dataset.msg)) e.preventDefault();
+  });
+});
+document.querySelectorAll('.js-copy-creds').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const txt = 'YourRA account details:\nSite: ' + btn.dataset.login +
+      '\nEmail: ' + btn.dataset.email +
+      '\nPassword: ' + btn.dataset.pw +
+      '\n\nPlease log in and change your password from the Profile page.';
+    navigator.clipboard.writeText(txt).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy message for WhatsApp', 2000);
+    });
+  });
+});
+</script>
 {% endblock %}

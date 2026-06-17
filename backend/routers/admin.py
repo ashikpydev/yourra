@@ -19,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from backend.auth import require_admin
 from backend.config import settings
 from backend.database import supabase_admin, supabase_auth
-from backend.services import mailer
+
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 templates = Jinja2Templates(directory="backend/templates")
@@ -135,7 +135,7 @@ async def admin_send_reset(email: str = Form(...)):
         supabase_auth.auth.reset_password_email(email, {"redirect_to": redirect_url})
     except Exception:
         pass
-    return RedirectResponse(url="/admin/users?msg=Reset+email+sent+to+%s" % email, status_code=303)
+    return RedirectResponse(url="/admin/users?msg=" + urllib.parse.quote(f"Reset email sent to {email}"), status_code=303)
 
 
 @router.post("/users/pause")
@@ -298,7 +298,7 @@ async def manual_activate(email: str = Form(...), minutes: int = Form(...), bkas
          "bkash_reference": bkash_ref, "notes": notes, "activated_by": "admin"}
     ).execute()
 
-    return RedirectResponse(url=f"/admin/users?msg=Added+{minutes}+min+to+{email}", status_code=303)
+    return RedirectResponse(url="/admin/users?msg=" + urllib.parse.quote(f"Added {minutes} min to {email}"), status_code=303)
 
 
 @router.post("/users/add-credits")
@@ -315,7 +315,7 @@ async def admin_add_credits(email: str = Form(...), minutes: int = Form(...)):
         {"user_id": p["id"], "minutes_added": minutes, "transaction_type": "manual_bkash",
          "notes": "Admin top-up", "activated_by": "admin"}
     ).execute()
-    return RedirectResponse(url=f"/admin/users?msg=Added+{minutes}+min+to+{email}", status_code=303)
+    return RedirectResponse(url="/admin/users?msg=" + urllib.parse.quote(f"Added {minutes} min to {email}"), status_code=303)
 
 
 @router.get("/trials")
