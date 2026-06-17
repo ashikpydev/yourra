@@ -40,24 +40,46 @@ def _fmt_ts(seconds) -> str:
     return f"{s // 3600}:{(s % 3600) // 60:02d}:{s % 60:02d}"
 
 
-PROMPT_TEMPLATE = """You are transcribing part {idx} of {total} of a Bangladeshi research interview or focus group discussion (FGD).
+PROMPT_TEMPLATE = """You are transcribing part {idx} of {total} of a Bangladeshi research interview or focus group discussion (FGD). The audio may be in ANY language.{lang_hint}
 
 This segment begins at {start_ts} of the full recording.
 
 Rules:
-- Transcribe ALL speech fully and accurately in Bangla. Do NOT summarize, paraphrase, shorten, or skip anything; every sentence matters for research.
+- The speech may be in Bangla OR another language (for example English, Rohingya, Chakma, Marma, Chittagonian, Hindi, Urdu, Arabic, Burmese). In ALL cases you must produce BOTH a Bangla version and an English version of everything that is said:
+  * If the speech is in Bangla, write it VERBATIM in the Bangla output, then translate it to natural English.
+  * If the speech is in any other language, FAITHFULLY TRANSLATE its meaning into natural Bangla for the Bangla output and into natural English for the English output. Never leave text in the original language.
+- Transcribe/translate ALL speech fully and accurately. Do NOT summarize, paraphrase, shorten, or skip anything; every sentence matters for research.
 - The MODERATOR is the person asking the questions and guiding the discussion. Label their lines "Moderator:". Label the people answering "Respondent 1:", "Respondent 2:", and so on. Use the SAME label for the same voice.
 - Put ONE speaker turn per line, and BEGIN EVERY line with an absolute timestamp in square brackets in [H:MM:SS] format marking when that turn is spoken, counting forward from {start_ts}. For example: "[{start_ts}] Moderator: ...". The timestamp must be as accurate as possible because it is used to play back the matching audio.
-- Keep natural spoken Bangla verbatim, including fillers, repetitions, and any English words spoken.
-- CONFIDENCE FLAGGING: when the audio is noisy, faint, or overlapping and you are NOT sure about a word or phrase, still write your best guess but wrap it in double parentheses like ((your best guess)) so a human can quickly find and verify it. Use [inaudible] only when nothing at all can be made out. Apply the SAME ((...)) flags in both the Bangla and the English versions.
+- Keep natural spoken style verbatim where the source is Bangla, including fillers, repetitions, and any English words spoken.
+- CONFIDENCE FLAGGING: when the audio is noisy, faint, or overlapping, or you are NOT fully sure of a word, phrase, or translation, still write your best guess but wrap it in double parentheses like ((your best guess)) so a human can quickly find and verify it. If a passage is in a language you cannot understand well enough to translate confidently, give your best attempt wrapped in ((...)) rather than skipping it. Use [inaudible] only when nothing at all can be made out. Apply the SAME ((...)) flags in both the Bangla and the English versions.
 {continuity}
 Return your answer in EXACTLY this format and nothing else:
 BANGLA:
-<each line as: [H:MM:SS] Speaker: verbatim Bangla>
+<each line as: [H:MM:SS] Speaker: Bangla text>
 
 ENGLISH:
-<the same lines translated to natural English, keeping the SAME [H:MM:SS] timestamp and the SAME speaker label at the start of each line>
+<the same lines as natural English, keeping the SAME [H:MM:SS] timestamp and the SAME speaker label at the start of each line>
 """
+
+# Language code -> a short label used to hint Gemini. "auto"/"other" give no
+# hint (let Gemini detect). Hinting the likely language meaningfully improves
+# results for low-resource languages that auto-detect may mislabel as Bangla.
+_LANG_LABELS = {
+    "auto": "", "other": "",
+    "bn": "Bangla", "en": "English",
+    "rohingya": "Rohingya", "chakma": "Chakma", "marma": "Marma",
+    "chittagonian": "Chittagonian", "hindi": "Hindi", "urdu": "Urdu",
+    "arabic": "Arabic", "burmese": "Burmese",
+}
+
+
+def _lang_hint(source_language: str | None) -> str:
+    label = _LANG_LABELS.get((source_language or "auto").strip().lower(), "")
+    if not label or label == "Bangla":
+        return ""
+    return (f" The speakers' main language is likely {label}; understand it and "
+            f"translate it faithfully into Bangla and English.")
 
 DEMO_PROMPT = """From the following research interview transcript, extract any demographic or survey details that are actually mentioned by the respondent or moderator. Return ONLY a compact JSON object with exactly these keys, using an empty string "" when something is not mentioned:
 {{"survey_type":"","resp_name":"","resp_age":"","resp_sex":"","resp_education":"","resp_profession":"","resp_location":""}}
@@ -100,12 +122,13 @@ def _upload_and_wait(path: str):
     return f
 
 
-def _transcribe_one(path, model_name, idx, total, start_ts, prev_tail):
+def _transcribe_one(path, model_name, idx, total, start_ts, prev_tail, lang_hint=""):
     f = _upload_and_wait(path)
     try:
         model = genai.GenerativeModel(model_name)
         prompt = PROMPT_TEMPLATE.format(
-            idx=idx, total=total, start_ts=start_ts, continuity=_continuity_hint(prev_tail)
+            idx=idx, total=total, start_ts=start_ts,
+            continuity=_continuity_hint(prev_tail), lang_hint=lang_hint,
         )
         resp = model.generate_content([prompt, f])
         return _parse(resp.text)
@@ -116,11 +139,14 @@ def _transcribe_one(path, model_name, idx, total, start_ts, prev_tail):
             pass
 
 
-async def _transcribe_one_with_retry(path, model_name, idx, total, start_ts, prev_tail, attempts=3):
+async def _transcribe_one_with_retry(path, model_name, idx, total, start_ts, prev_tail,
+                                     lang_hint="", attempts=3):
     last = None
     for attempt in range(1, attempts + 1):
         try:
-            return await asyncio.to_thread(_transcribe_one, path, model_name, idx, total, start_ts, prev_tail)
+            return await asyncio.to_thread(
+                _transcribe_one, path, model_name, idx, total, start_ts, prev_tail, lang_hint
+            )
         except Exception as e:
             last = e
             await asyncio.sleep(2 * attempt)
@@ -138,10 +164,13 @@ def _mock(chunk_paths, offsets):
     return "\n\n".join(bn), "\n\n".join(en)
 
 
-async def transcribe_all_chunks(chunk_paths, model_name, offsets=None, progress_cb=None):
-    """Transcribe every chunk in order and concatenate losslessly.
+async def transcribe_all_chunks(chunk_paths, model_name, offsets=None, progress_cb=None,
+                                source_language="auto"):
+    """Transcribe/translate every chunk in order and concatenate losslessly.
+    The audio may be in any language; the output is always Bangla + English.
     `offsets[i]` is the start time (seconds) of chunk i in the full recording,
-    used for absolute timestamps. `progress_cb(done, total)` moves the UI bar."""
+    used for absolute timestamps. `progress_cb(done, total)` moves the UI bar.
+    `source_language` is an optional hint (e.g. "rohingya") to improve accuracy."""
     total = len(chunk_paths)
     offsets = offsets or [0] * total
     if _use_mock():
@@ -149,11 +178,14 @@ async def transcribe_all_chunks(chunk_paths, model_name, offsets=None, progress_
             progress_cb(total, total)
         return _mock(chunk_paths, offsets)
 
+    lang_hint = _lang_hint(source_language)
     bn_parts, en_parts = [], []
     prev_tail = ""
     for i, path in enumerate(chunk_paths, 1):
         start_ts = _fmt_ts(offsets[i - 1] if i - 1 < len(offsets) else 0)
-        bn, en = await _transcribe_one_with_retry(path, model_name, i, total, start_ts, prev_tail)
+        bn, en = await _transcribe_one_with_retry(
+            path, model_name, i, total, start_ts, prev_tail, lang_hint
+        )
         bn_parts.append(bn)
         en_parts.append(en)
         prev_tail = "\n".join((en or "").strip().splitlines()[-4:])

@@ -20,7 +20,8 @@ def _get_queue():
     return Queue(_QUEUE_NAME, connection=Redis.from_url(settings.REDIS_URL))
 
 
-def enqueue_transcription(job_id, user_id, r2_key, model_name, max_minutes) -> bool:
+def enqueue_transcription(job_id, user_id, r2_key, model_name, max_minutes,
+                          source_language="auto") -> bool:
     """Enqueue a transcription job. Returns True if it was queued, False if no
     queue is configured (caller should then run it in-process)."""
     q = _get_queue()
@@ -28,7 +29,7 @@ def enqueue_transcription(job_id, user_id, r2_key, model_name, max_minutes) -> b
         return False
     q.enqueue(
         "backend.services.pipeline.run_job_sync",
-        job_id, user_id, r2_key, model_name, max_minutes,
+        job_id, user_id, r2_key, model_name, max_minutes, source_language,
         job_timeout=7200,  # up to 2 hours per job
     )
     return True

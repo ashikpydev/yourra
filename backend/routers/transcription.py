@@ -64,6 +64,7 @@ async def upload_audio(
     resp_location: str = Form(""),
     interviewer: str = Form(""),
     interview_date: str = Form(""),
+    source_language: str = Form("auto"),
     user=Depends(get_current_user),
 ):
     import json
@@ -139,13 +140,14 @@ async def upload_audio(
     # in-process background task when no queue is configured.
     from backend.services import jobs
     queued = jobs.enqueue_transcription(
-        job_id, user["_auth_user_id"], r2_key, model_name, user["credits_minutes"]
+        job_id, user["_auth_user_id"], r2_key, model_name, user["credits_minutes"],
+        source_language,
     )
     print(f"[upload] job {job_id} created; queued_to_redis={queued}", flush=True)
     if not queued:
         background_tasks.add_task(
             run_transcription_job, job_id, user["_auth_user_id"], r2_key, model_name,
-            user["credits_minutes"],
+            user["credits_minutes"], source_language,
         )
 
     return {"job_id": job_id}

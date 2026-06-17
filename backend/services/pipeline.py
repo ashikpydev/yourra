@@ -187,14 +187,16 @@ def recover_stuck_jobs(user_id: str):
         pass
 
 
-def run_job_sync(job_id: str, user_id: str, r2_key: str, model_name: str, max_minutes=None):
+def run_job_sync(job_id: str, user_id: str, r2_key: str, model_name: str, max_minutes=None,
+                 source_language="auto"):
     """Synchronous entrypoint for the RQ worker (it runs sync functions)."""
     import asyncio
-    asyncio.run(run_transcription_job(job_id, user_id, r2_key, model_name, max_minutes))
+    asyncio.run(run_transcription_job(job_id, user_id, r2_key, model_name, max_minutes,
+                                      source_language))
 
 
 async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_name: str,
-                                max_minutes: int | None = None):
+                                max_minutes: int | None = None, source_language: str = "auto"):
     print(f"[pipeline] job {job_id} STARTING (model={model_name}, max_minutes={max_minutes})", flush=True)
 
     # Guard against processing when the user has no credits left (race condition
@@ -218,11 +220,13 @@ async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_na
     # Semaphore: cap concurrent in-process jobs to avoid simultaneous large
     # RAM allocations crashing the server.
     async with _get_semaphore():
-        await _run_transcription_job_inner(job_id, user_id, r2_key, model_name, max_minutes)
+        await _run_transcription_job_inner(job_id, user_id, r2_key, model_name, max_minutes,
+                                           source_language)
 
 
 async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, model_name: str,
-                                       max_minutes: int | None = None):
+                                       max_minutes: int | None = None,
+                                       source_language: str = "auto"):
     job_dir = os.path.join(settings.TMP_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
 
@@ -272,7 +276,8 @@ async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, m
             _update_job(job_id, status="processing", progress_pct=min(95, pct))
 
         transcript_bn, transcript_en = await gemini.transcribe_all_chunks(
-            chunk_paths, model_name, offsets=offsets, progress_cb=_progress
+            chunk_paths, model_name, offsets=offsets, progress_cb=_progress,
+            source_language=source_language,
         )
         print(f"[pipeline] job {job_id} transcription done ({len(transcript_bn)} bn chars)", flush=True)
 

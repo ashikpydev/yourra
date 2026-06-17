@@ -30,7 +30,7 @@
       <!-- Upload -->
       <div class="card card-pad">
         <h2 class="font-display font-bold mb-1">Upload audio for transcription</h2>
-        <p class="text-xs muted mb-1">MP3, WAV, M4A, OGG or MP4, up to {{ max_upload_mb }}MB. Bangla and English with speaker labels.</p>
+        <p class="text-xs muted mb-1">MP3, WAV, M4A, OGG or MP4, up to {{ max_upload_mb }}MB. Any language in — Bangla + English out, with speaker labels.</p>
         <p class="text-xs mb-4"><span class="font-semibold text-indigo-700" x-text="profile.credits_minutes + ' minutes remaining'"></span><span class="muted">. Only your remaining minutes are transcribed; a longer file is trimmed to that length.</span></p>
         <form @submit.prevent="upload">
           <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-xl py-8 px-4 cursor-pointer hover:border-indigo-400 transition"
@@ -40,6 +40,25 @@
             <input type="file" name="audio" x-ref="fileInput" accept=".mp3,.wav,.m4a,.ogg,.mp4" required class="hidden"
                    @change="onFilePick()">
           </label>
+
+          <div class="mt-4">
+            <label class="label">Audio language</label>
+            <select x-model="sourceLanguage" class="field">
+              <option value="auto">Auto-detect (recommended)</option>
+              <option value="bn">Bangla</option>
+              <option value="en">English</option>
+              <option value="rohingya">Rohingya</option>
+              <option value="chakma">Chakma</option>
+              <option value="marma">Marma</option>
+              <option value="chittagonian">Chittagonian</option>
+              <option value="hindi">Hindi</option>
+              <option value="urdu">Urdu</option>
+              <option value="arabic">Arabic</option>
+              <option value="burmese">Burmese</option>
+              <option value="other">Other</option>
+            </select>
+            <p class="text-xs muted mt-1">We transcribe or translate any language into Bangla and English. For less common languages, please review the result before final use.</p>
+          </div>
 
           <div class="mt-4">
             <button type="button" class="text-sm text-indigo-600 font-medium" @click="showMeta = !showMeta">
@@ -218,6 +237,7 @@ function dashboard() {
     fileName: '',
     showMeta: false,
     meta: { survey_type:'', resp_name:'', resp_age:'', resp_sex:'', resp_education:'', resp_profession:'', resp_location:'', interviewer:'', interview_date:'' },
+    sourceLanguage: 'auto',
     selectedBundle: '',
     customHours: 5,
     get customPrice() { return Math.round(this.customHours * 399); },
@@ -319,6 +339,7 @@ function dashboard() {
       this.uploadPct = 0;
       const form = new FormData();
       form.append('audio', file);
+      form.append('source_language', this.sourceLanguage);
       for (const [k, v] of Object.entries(this.meta)) { if (v) form.append(k, v); }
       try {
         await this.sendUpload(form);
