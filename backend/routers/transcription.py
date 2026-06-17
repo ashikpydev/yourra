@@ -34,6 +34,22 @@ BUNDLES = [
 # Flat per-hour rate used for Custom orders (any number of hours).
 PER_HOUR_BDT = 399
 
+# How many jobs one user may have running at once. Protects paid credits and
+# server memory from a flood of simultaneous uploads.
+MAX_ACTIVE_JOBS = 3
+
+
+def _active_job_count(user_id: str) -> int:
+    """Number of the user's jobs that are queued or in progress."""
+    res = (
+        supabase_admin.table("transcription_jobs")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .in_("status", ["pending", "processing", "merging"])
+        .execute()
+    )
+    return res.count or 0
+
 
 @router.post("/upload")
 async def upload_audio(
@@ -84,18 +100,12 @@ async def upload_audio(
         )
 
     # Prevent credit race: block if user already has too many jobs in flight.
-    # Each pending/processing job could consume all remaining credits, so cap at 3.
-    active = (
-        supabase_admin.table("transcription_jobs")
-        .select("id", count="exact")
-        .eq("user_id", user["_auth_user_id"])
-        .in_("status", ["pending", "processing", "merging"])
-        .execute()
-    )
-    if (active.count or 0) >= 3:
+    # Each pending/processing job could consume all remaining credits.
+    if _active_job_count(user["_auth_user_id"]) >= MAX_ACTIVE_JOBS:
         raise HTTPException(
             status_code=429,
-            detail="You already have 3 jobs in progress. Wait for one to complete before uploading more.",
+            detail=f"You already have {MAX_ACTIVE_JOBS} jobs in progress. "
+                   "Wait for one to finish before uploading more.",
         )
 
     job_id = str(uuid.uuid4())
@@ -153,6 +163,102 @@ async def get_status(job_id: str, user=Depends(get_current_user)):
     if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
     return result.data[0]
+
+
+@router.post("/jobs/{job_id}/retry")
+async def retry_job(
+    job_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+):
+    """Reprocess a failed job using the audio already stored in R2 — the user
+    does not have to upload the (often large) file again."""
+    result = (
+        supabase_admin.table("transcription_jobs")
+        .select("status, audio_r2_key, model_used")
+        .eq("id", job_id)
+        .eq("user_id", user["_auth_user_id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    row = result.data[0]
+    if row["status"] != "failed":
+        raise HTTPException(status_code=409, detail="Only failed jobs can be retried.")
+
+    r2_key = row.get("audio_r2_key")
+    if not r2_key or not storage.object_exists(r2_key):
+        raise HTTPException(
+            status_code=410,
+            detail="The original audio is no longer available. Please upload the file again.",
+        )
+
+    if user["credits_minutes"] <= 0:
+        raise HTTPException(status_code=402, detail="You have 0 minutes left. Please top up first.")
+
+    if _active_job_count(user["_auth_user_id"]) >= MAX_ACTIVE_JOBS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"You already have {MAX_ACTIVE_JOBS} jobs in progress. "
+                   "Wait for one to finish before retrying.",
+        )
+
+    # Reset the job to a fresh queued state.
+    supabase_admin.table("transcription_jobs").update(
+        {"status": "pending", "progress_pct": 0, "error_message": None}
+    ).eq("id", job_id).eq("user_id", user["_auth_user_id"]).execute()
+
+    model_name = settings.GEMINI_MODEL_PRO
+    from backend.services import jobs
+    queued = jobs.enqueue_transcription(
+        job_id, user["_auth_user_id"], r2_key, model_name, user["credits_minutes"]
+    )
+    if not queued:
+        background_tasks.add_task(
+            run_transcription_job, job_id, user["_auth_user_id"], r2_key, model_name,
+            user["credits_minutes"],
+        )
+    return {"ok": True}
+
+
+@router.delete("/jobs/{job_id}")
+async def delete_or_cancel_job(job_id: str, user=Depends(get_current_user)):
+    """Cancel a job that is still queued/processing, or permanently delete a
+    finished/failed one (removing its stored audio). Owner-checked."""
+    result = (
+        supabase_admin.table("transcription_jobs")
+        .select("status, audio_r2_key")
+        .eq("id", job_id)
+        .eq("user_id", user["_auth_user_id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    row = result.data[0]
+    status = row["status"]
+
+    if status in ("pending", "processing", "merging"):
+        # Flag for cancellation — the running pipeline notices at its next
+        # checkpoint, stops, refunds nothing (no credits were charged yet),
+        # and drops the audio. A job that never started just stays cancelled.
+        supabase_admin.table("transcription_jobs").update(
+            {"status": "cancelled", "error_message": "Cancelled by user."}
+        ).eq("id", job_id).eq("user_id", user["_auth_user_id"]).execute()
+        return {"ok": True, "cancelled": True}
+
+    # Finished/failed/cancelled: hard-delete the record and its audio.
+    key = row.get("audio_r2_key")
+    if key:
+        try:
+            storage.delete_object(key)
+        except Exception:
+            pass
+    supabase_admin.table("transcription_jobs").delete().eq("id", job_id).eq(
+        "user_id", user["_auth_user_id"]
+    ).execute()
+    return {"ok": True, "deleted": True}
 
 
 @router.get("/result/{job_id}")

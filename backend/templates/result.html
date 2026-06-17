@@ -34,7 +34,18 @@
     <!-- Failed -->
     <div x-show="status === 'failed'" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm px-4 py-3">
       <p class="font-semibold mb-1">This transcription didn't finish.</p>
-      <p x-text="errorMessage || 'Please try uploading again, or contact support.'"></p>
+      <p x-text="errorMessage || 'Please try again, or contact support.'"></p>
+      <button @click="retryJob()" :disabled="retrying" class="btn btn-primary btn-sm mt-3">
+        <span x-show="!retrying">↻ Retry (no re-upload needed)</span>
+        <span x-show="retrying">Retrying…</span>
+      </button>
+      <p x-show="retryError" x-text="retryError" class="text-rose-700 mt-2"></p>
+    </div>
+
+    <!-- Cancelled -->
+    <div x-show="status === 'cancelled'" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm px-4 py-3">
+      <p class="font-semibold mb-1">This job was cancelled.</p>
+      <p>No minutes were charged. You can upload the file again from your dashboard whenever you're ready.</p>
     </div>
 
     <!-- Completed: downloads -->
@@ -135,6 +146,8 @@ function resultPage() {
     dirty: false,
     saving: false,
     justSaved: false,
+    retrying: false,
+    retryError: '',
     autoScroll: true,
     _lastScrollT: -1,
     _flagIdx: -1,
@@ -254,14 +267,36 @@ function resultPage() {
 
     badgeClass(s) {
       return { completed:'badge-green', failed:'badge-rose', pending:'badge-gray',
-               processing:'badge-amber', merging:'badge-amber' }[s] || 'badge-gray';
+               processing:'badge-amber', merging:'badge-amber', cancelled:'badge-gray' }[s] || 'badge-gray';
     },
     stageLabel() {
       if (this.status === 'completed') return 'Completed';
       if (this.status === 'failed') return 'Failed';
+      if (this.status === 'cancelled') return 'Cancelled';
       if (this.status === 'merging') return 'Finalizing';
       if (this.status === 'processing') return 'Transcribing';
       return 'Queued';
+    },
+    async retryJob() {
+      this.retrying = true;
+      this.retryError = '';
+      try {
+        const res = await fetch('/api/jobs/{{ job_id }}/retry', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Could not retry this job.');
+        // Re-enter the in-progress flow without a full reload.
+        this.status = 'pending';
+        this.progress = 0;
+        this.errorMessage = '';
+        this.elapsed = 0;
+        this.createdAt = new Date().toISOString();
+        this.ticker = setInterval(() => this.elapsed++, 1000);
+        this.poller = setInterval(() => this.poll(), 5000);
+      } catch (e) {
+        this.retryError = e.message;
+      } finally {
+        this.retrying = false;
+      }
     },
     elapsedText() {
       let secs = this.elapsed;

@@ -141,6 +141,10 @@ class _Query:
         self._filters.append((col, ">=", val))
         return self
 
+    def in_(self, col, vals):
+        self._filters.append((col, "in", list(vals)))
+        return self
+
     def order(self, col, desc=False):
         self._order = col
         self._desc = desc
@@ -156,8 +160,16 @@ class _Query:
             return "", []
         clauses, params = [], []
         for col, op, val in self._filters:
-            clauses.append(f"{col} {op} ?")
-            params.append(val)
+            if op == "in":
+                if not val:
+                    clauses.append("0")  # IN () matches nothing
+                    continue
+                placeholders = ", ".join("?" for _ in val)
+                clauses.append(f"{col} in ({placeholders})")
+                params.extend(val)
+            else:
+                clauses.append(f"{col} {op} ?")
+                params.append(val)
         return " where " + " and ".join(clauses), params
 
     def _prep_row(self, row: dict, cols: set) -> dict:

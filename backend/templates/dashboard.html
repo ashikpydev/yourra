@@ -70,9 +70,12 @@
           <div class="mt-4 flex items-center gap-3">
             <button type="submit" :disabled="uploading || profile.credits_minutes <= 0" class="btn btn-primary">
               <span x-show="!uploading">Upload &amp; transcribe</span>
-              <span x-show="uploading">Uploading…</span>
+              <span x-show="uploading" x-text="uploadPct < 100 ? ('Uploading… ' + uploadPct + '%') : 'Submitting…'"></span>
             </button>
             <span class="text-xs muted" x-show="profile.credits_minutes <= 0">Top up to enable uploads.</span>
+          </div>
+          <div x-show="uploading" x-cloak class="mt-3">
+            <div class="track"><span :style="`width:${uploadPct}%`"></span></div>
           </div>
           <p x-show="uploadError" x-text="uploadError" class="text-rose-600 text-sm mt-3"></p>
           <p x-show="uploadSuccess" x-text="uploadSuccess" class="text-emerald-700 text-sm mt-3 font-medium"></p>
@@ -106,7 +109,12 @@
                   </td>
                   <td class="py-3 pr-4 muted" x-text="job.progress_pct + '%'"></td>
                   <td class="py-3 pr-4 muted" x-text="job.duration_minutes ? job.duration_minutes + ' min' : '-'"></td>
-                  <td class="py-3 text-right"><a :href="'/jobs/' + job.id" class="text-indigo-600 font-medium">View →</a></td>
+                  <td class="py-3 text-right whitespace-nowrap">
+                    <a :href="'/jobs/' + job.id" class="text-indigo-600 font-medium">View</a>
+                    <button x-show="job.status === 'failed'" @click="retryJob(job)" class="text-emerald-600 font-medium ml-3">Retry</button>
+                    <button x-show="['pending','processing','merging'].includes(job.status)" @click="cancelJob(job)" class="text-amber-600 font-medium ml-3">Cancel</button>
+                    <button x-show="['completed','failed','cancelled'].includes(job.status)" @click="deleteJob(job)" class="text-rose-500 font-medium ml-3">Delete</button>
+                  </td>
                 </tr>
               </template>
               <tr x-show="jobs.length === 0">
@@ -194,6 +202,7 @@ function dashboard() {
     jobs: {{ jobs | tojson }},
     maxSeen: Math.max({{ user.credits_minutes }}, 1),
     uploading: false,
+    uploadPct: 0,
     uploadError: '',
     uploadSuccess: '',
     fileName: '',
@@ -223,6 +232,7 @@ function dashboard() {
         pending: 'badge-gray',
         processing: 'badge-amber',
         merging: 'badge-amber',
+        cancelled: 'badge-gray',
       }[status] || 'badge-gray';
     },
 
@@ -269,13 +279,12 @@ function dashboard() {
       this.uploading = true;
       this.uploadError = '';
       this.uploadSuccess = '';
+      this.uploadPct = 0;
       const form = new FormData();
       form.append('audio', file);
       for (const [k, v] of Object.entries(this.meta)) { if (v) form.append(k, v); }
       try {
-        const res = await fetch('/api/upload', { method: 'POST', body: form });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+        await this.sendUpload(form);
         this.$refs.fileInput.value = '';
         this.fileName = '';
         this.uploadSuccess = 'File submitted for transcription. You can upload another file now.';
@@ -284,7 +293,56 @@ function dashboard() {
         this.uploadError = e.message;
       } finally {
         this.uploading = false;
+        this.uploadPct = 0;
       }
+    },
+
+    // XMLHttpRequest (not fetch) so we get real upload progress — important for
+    // large files on slow connections, so the user never thinks it froze.
+    sendUpload(form) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) this.uploadPct = Math.round((e.loaded / e.total) * 100);
+        };
+        xhr.onload = () => {
+          let data = {};
+          try { data = JSON.parse(xhr.responseText); } catch (_) {}
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.detail || 'Upload failed'));
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload. Please try again.'));
+        xhr.send(form);
+      });
+    },
+
+    async retryJob(job) {
+      if (!confirm('Retry this transcription using the audio we already have? No re-upload needed.')) return;
+      try {
+        const res = await fetch('/api/jobs/' + job.id + '/retry', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Could not retry this job.');
+        await this.refresh();
+      } catch (e) { alert(e.message); }
+    },
+
+    async cancelJob(job) {
+      if (!confirm("Cancel this job? You won't be charged any minutes for it.")) return;
+      try {
+        const res = await fetch('/api/jobs/' + job.id, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Could not cancel.'); }
+        await this.refresh();
+      } catch (e) { alert(e.message); }
+    },
+
+    async deleteJob(job) {
+      if (!confirm('Delete this transcription permanently? This cannot be undone.')) return;
+      try {
+        const res = await fetch('/api/jobs/' + job.id, { method: 'DELETE' });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Could not delete.'); }
+        await this.refresh();
+      } catch (e) { alert(e.message); }
     },
 
     async topup() {

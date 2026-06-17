@@ -40,8 +40,71 @@ def _get_semaphore() -> asyncio.Semaphore:
     return _JOB_SEMAPHORE
 
 
+class JobCancelled(Exception):
+    """Raised inside the pipeline when a user cancels a job mid-flight."""
+
+
 def _update_job(job_id: str, **fields):
     supabase_admin.table("transcription_jobs").update(fields).eq("id", job_id).execute()
+
+
+def _job_status(job_id: str) -> str | None:
+    try:
+        row = (
+            supabase_admin.table("transcription_jobs")
+            .select("status").eq("id", job_id).execute().data
+        )
+        return row[0]["status"] if row else None
+    except Exception:
+        return None
+
+
+def _raise_if_cancelled(job_id: str):
+    if _job_status(job_id) == "cancelled":
+        raise JobCancelled()
+
+
+def _notify(job_id: str, user_id: str, ok: bool):
+    """Email the owner that their transcript is ready (or that it failed).
+    Best-effort: silently does nothing if SMTP isn't configured or anything
+    goes wrong — it must never break the pipeline."""
+    try:
+        from backend.services import mailer
+
+        prof = (
+            supabase_admin.table("user_profiles")
+            .select("email").eq("id", user_id).execute().data
+        )
+        if not prof or not prof[0].get("email"):
+            return
+        email = prof[0]["email"]
+
+        jobrow = (
+            supabase_admin.table("transcription_jobs")
+            .select("original_filename").eq("id", job_id).execute().data
+        )
+        filename = (jobrow[0].get("original_filename") if jobrow else "") or "your audio"
+        url = f"{settings.APP_BASE_URL.rstrip('/')}/jobs/{job_id}"
+
+        if ok:
+            subject = "✅ Your transcript is ready — YourRA"
+            body = (
+                f'Good news! Your transcription of "{filename}" is complete.\n\n'
+                f"View, edit, and download it here:\n{url}\n\n"
+                f"— YourRA"
+            )
+        else:
+            subject = "Your transcription didn't finish — YourRA"
+            body = (
+                f'Unfortunately the transcription of "{filename}" did not complete.\n\n'
+                f"You can retry it from your dashboard with one click — no re-upload "
+                f"needed:\n{url}\n\n"
+                f"If it keeps failing, please contact support.\n\n"
+                f"— YourRA"
+            )
+        mailer.send_email(email, subject, body)
+    except Exception:
+        pass
 
 
 def cleanup_expired_audio(user_id: str):
@@ -119,6 +182,7 @@ async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, m
     chunks_dir = os.path.join(job_dir, "chunks")
 
     try:
+        _raise_if_cancelled(job_id)
         _update_job(job_id, status="processing", progress_pct=10)
 
         # 1. Download original from R2 (in a thread so the web server stays free)
@@ -154,6 +218,8 @@ async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, m
         #    so the bar moves smoothly (15% -> ~95%). No lossy boundary stitch:
         #    chunk transcripts are concatenated as-is.
         def _progress(done, total):
+            # Abort promptly if the user cancelled while chunks were processing.
+            _raise_if_cancelled(job_id)
             pct = 15 + int((done / max(total, 1)) * 80)
             _update_job(job_id, status="processing", progress_pct=min(95, pct))
 
@@ -213,6 +279,20 @@ async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, m
         # accuracy. It is auto-deleted after R2_RETENTION_DAYS by
         # cleanup_expired_audio(), called opportunistically on dashboard load.
 
+        # Let the user know their transcript is ready (they likely left the page).
+        await asyncio.to_thread(_notify, job_id, user_id, True)
+
+    except JobCancelled:
+        # User cancelled mid-flight: mark cancelled, drop the audio, no credit
+        # charge, no email. Not an error.
+        print(f"[pipeline] job {job_id} CANCELLED by user", flush=True)
+        try:
+            storage.delete_object(r2_key)
+        except Exception:
+            pass
+        _update_job(job_id, status="cancelled", audio_r2_key=None,
+                    error_message="Cancelled by user before completion.")
+
     except Exception as e:
         print(f"[pipeline] job {job_id} FAILED: {e}", flush=True)
         print(traceback.format_exc(), flush=True)
@@ -221,6 +301,8 @@ async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, m
             status="failed",
             error_message=f"{e}\n{traceback.format_exc()[-1000:]}",
         )
+        # Notify the owner so they can retry without watching the page.
+        await asyncio.to_thread(_notify, job_id, user_id, False)
     finally:
         # 7. Cleanup local temp files (R2 original kept for retention window)
         shutil.rmtree(job_dir, ignore_errors=True)
