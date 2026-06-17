@@ -112,3 +112,55 @@ async def logout():
     redirect.delete_cookie(ACCESS_COOKIE)
     redirect.delete_cookie(REFRESH_COOKIE)
     return redirect
+
+
+@router.post("/api/auth/forgot-password")
+async def forgot_password(request: Request, email: str = Form(...)):
+    if ratelimit.too_many(f"forgot:{client_ip(request)}", max_hits=5, window_seconds=3600):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+    if settings.LOCAL_MODE:
+        raise HTTPException(status_code=400, detail="Password reset is not available in local mode.")
+    try:
+        from backend.config import settings as s
+        redirect_url = f"{s.APP_BASE_URL.rstrip('/')}/reset-password"
+        supabase_auth.auth.reset_password_email(email.strip().lower(), {"redirect_to": redirect_url})
+    except Exception:
+        pass
+    # Always return OK — don't reveal whether the email exists
+    return {"ok": True}
+
+
+@router.post("/api/auth/reset-password")
+async def reset_password(access_token: str = Form(...), new_password: str = Form(...)):
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    try:
+        user_resp = supabase_auth.auth.get_user(access_token)
+        user = getattr(user_resp, "user", None)
+        if not user:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+        supabase_admin.auth.admin.update_user_by_id(user.id, {"password": new_password})
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
+    return {"ok": True}
+
+
+@router.post("/api/auth/change-password")
+async def change_password(
+    request: Request,
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    from backend.auth import get_current_user
+    user = await get_current_user(request)
+    if new_password != confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    try:
+        supabase_admin.auth.admin.update_user_by_id(user["_auth_user_id"], {"password": new_password})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Could not update password. Please try again.")
+    return {"ok": True}

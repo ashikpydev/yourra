@@ -42,6 +42,7 @@
         <a href="/privacy" class="nav-link">Privacy &amp; ethics</a>
         {% if user %}
           <a href="/dashboard" class="nav-link">Dashboard</a>
+          <a href="/profile" class="nav-link">Account</a>
           <form action="/logout" method="post"><button type="submit" class="btn btn-secondary btn-sm">Log out</button></form>
         {% else %}
           <a href="/login" class="nav-link">Login</a>
@@ -60,6 +61,7 @@
         <a href="/privacy" class="nav-link">Privacy &amp; ethics</a>
         {% if user %}
           <a href="/dashboard" class="nav-link">Dashboard</a>
+          <a href="/profile" class="nav-link">Account</a>
           <form action="/logout" method="post"><button type="submit" class="btn btn-secondary btn-sm w-full">Log out</button></form>
         {% else %}
           <a href="/login" class="nav-link">Login</a>

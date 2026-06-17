@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Account settings — YourRA{% endblock %}
+{% block content %}
+<section class="container-page py-16 flex justify-center">
+  <div class="w-full max-w-md">
+    <h1 class="text-2xl font-extrabold mb-1">Account settings</h1>
+    <p class="muted text-sm mb-8">{{ user.email }}</p>
+
+    <div class="card card-pad mb-6" x-data="{ loading: false, error: '', success: '' }">
+      <h2 class="text-base font-semibold mb-4">Change password</h2>
+      <form @submit.prevent="
+        loading = true; error = ''; success = '';
+        fetch('/api/auth/change-password', { method: 'POST', body: new FormData($el) })
+          .then(async r => {
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Failed');
+            success = 'Password updated.';
+            $el.reset();
+          })
+          .catch(e => { error = e.message; })
+          .finally(() => { loading = false; })
+      ">
+        <label class="label">New password</label>
+        <input type="password" name="new_password" required minlength="8" class="field mb-4" placeholder="At least 8 characters">
+        <label class="label">Confirm new password</label>
+        <input type="password" name="confirm_password" required minlength="8" class="field mb-5" placeholder="Repeat new password">
+        <button type="submit" :disabled="loading" class="btn btn-primary w-full">
+          <span x-show="!loading">Update password</span>
+          <span x-show="loading">Saving…</span>
+        </button>
+        <p x-show="error" x-text="error" class="text-rose-600 text-sm mt-3"></p>
+        <p x-show="success" x-text="success" class="text-green-600 text-sm mt-3"></p>
+      </form>
+    </div>
+
+    <p class="text-center text-sm muted">
+      <a href="/dashboard" class="text-indigo-600 font-medium">Back to dashboard</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

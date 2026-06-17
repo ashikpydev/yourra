@@ -254,6 +254,26 @@ async def privacy(request: Request):
     )
 
 
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    user = await get_optional_user(request)
+    if not user:
+        return RedirectResponse(url="/login")
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user})
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    user = await get_optional_user(request)
+    return templates.TemplateResponse("forgot_password.html", {"request": request, "user": user})
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    user = await get_optional_user(request)
+    return templates.TemplateResponse("reset_password.html", {"request": request, "user": user})
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
