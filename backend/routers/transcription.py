@@ -69,9 +69,11 @@ async def upload_audio(
             detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
 
-    # Check size against MAX_UPLOAD_MB (best-effort; Content-Length may be absent)
-    contents = await audio.read()
-    size_mb = len(contents) / (1024 * 1024)
+    # Check size without loading the whole file into RAM — seek to end for size.
+    audio.file.seek(0, 2)
+    file_size = audio.file.tell()
+    audio.file.seek(0)
+    size_mb = file_size / (1024 * 1024)
     if size_mb > settings.MAX_UPLOAD_MB:
         raise HTTPException(status_code=400, detail=f"File too large (max {settings.MAX_UPLOAD_MB} MB).")
 
@@ -81,11 +83,26 @@ async def upload_audio(
             detail="You have 0 transcription minutes left. Please top up to upload more.",
         )
 
+    # Prevent credit race: block if user already has too many jobs in flight.
+    # Each pending/processing job could consume all remaining credits, so cap at 3.
+    active = (
+        supabase_admin.table("transcription_jobs")
+        .select("id", count="exact")
+        .eq("user_id", user["_auth_user_id"])
+        .in_("status", ["pending", "processing", "merging"])
+        .execute()
+    )
+    if (active.count or 0) >= 3:
+        raise HTTPException(
+            status_code=429,
+            detail="You already have 3 jobs in progress. Wait for one to complete before uploading more.",
+        )
+
     job_id = str(uuid.uuid4())
     r2_key = f"uploads/{user['_auth_user_id']}/{job_id}/{audio.filename}"
 
-    # Stream to R2
-    storage.upload_fileobj(io.BytesIO(contents), r2_key, content_type=audio.content_type)
+    # Stream directly to R2 from the spooled temp file — no large bytes object in RAM.
+    storage.upload_fileobj(audio.file, r2_key, content_type=audio.content_type)
 
     # Always use the best model (Gemini Pro) for every job.
     model_name = settings.GEMINI_MODEL_PRO

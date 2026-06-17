@@ -24,6 +24,21 @@ from backend.config import settings
 from backend.database import supabase_admin
 from backend.services import chunking, gemini, storage
 
+# Limit how many transcription jobs may run concurrently inside one process.
+# This prevents multiple large audio files from being decoded into RAM at the
+# same time (the primary cause of Railway OOM).  Set MAX_CONCURRENT_JOBS in
+# your env to override; the Redis/RQ worker path is naturally limited to 1 job
+# per worker process, so this mainly guards the in-process BackgroundTask path.
+_MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "2"))
+_JOB_SEMAPHORE: asyncio.Semaphore | None = None
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _JOB_SEMAPHORE
+    if _JOB_SEMAPHORE is None:
+        _JOB_SEMAPHORE = asyncio.Semaphore(_MAX_CONCURRENT_JOBS)
+    return _JOB_SEMAPHORE
+
 
 def _update_job(job_id: str, **fields):
     supabase_admin.table("transcription_jobs").update(fields).eq("id", job_id).execute()
@@ -70,6 +85,33 @@ def run_job_sync(job_id: str, user_id: str, r2_key: str, model_name: str, max_mi
 async def run_transcription_job(job_id: str, user_id: str, r2_key: str, model_name: str,
                                 max_minutes: int | None = None):
     print(f"[pipeline] job {job_id} STARTING (model={model_name}, max_minutes={max_minutes})", flush=True)
+
+    # Guard against processing when the user has no credits left (race condition
+    # where two uploads cleared the balance simultaneously).
+    try:
+        profile_check = (
+            supabase_admin.table("user_profiles")
+            .select("credits_minutes")
+            .eq("id", user_id)
+            .execute()
+            .data
+        )
+        if profile_check and profile_check[0]["credits_minutes"] <= 0:
+            _update_job(job_id, status="failed",
+                        error_message="No credits remaining. Please top up and re-upload.")
+            print(f"[pipeline] job {job_id} aborted — user has 0 credits", flush=True)
+            return
+    except Exception:
+        pass  # If the check fails, proceed and let the pipeline handle it normally
+
+    # Semaphore: cap concurrent in-process jobs to avoid simultaneous large
+    # RAM allocations crashing the server.
+    async with _get_semaphore():
+        await _run_transcription_job_inner(job_id, user_id, r2_key, model_name, max_minutes)
+
+
+async def _run_transcription_job_inner(job_id: str, user_id: str, r2_key: str, model_name: str,
+                                       max_minutes: int | None = None):
     job_dir = os.path.join(settings.TMP_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
 

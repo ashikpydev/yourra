@@ -75,6 +75,7 @@
             <span class="text-xs muted" x-show="profile.credits_minutes <= 0">Top up to enable uploads.</span>
           </div>
           <p x-show="uploadError" x-text="uploadError" class="text-rose-600 text-sm mt-3"></p>
+          <p x-show="uploadSuccess" x-text="uploadSuccess" class="text-emerald-700 text-sm mt-3 font-medium"></p>
         </form>
         <div class="mt-4 flex items-start gap-2 rounded-lg p-3 text-xs" style="background:var(--brand-50);color:var(--ink-700)">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0 mt-0.5 text-indigo-600"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 11v5M12 7.5h.01"/></svg>
@@ -194,6 +195,7 @@ function dashboard() {
     maxSeen: Math.max({{ user.credits_minutes }}, 1),
     uploading: false,
     uploadError: '',
+    uploadSuccess: '',
     fileName: '',
     showMeta: false,
     meta: { survey_type:'', resp_name:'', resp_age:'', resp_sex:'', resp_education:'', resp_profession:'', resp_location:'', interviewer:'', interview_date:'' },
@@ -265,6 +267,8 @@ function dashboard() {
         }
       }
       this.uploading = true;
+      this.uploadError = '';
+      this.uploadSuccess = '';
       const form = new FormData();
       form.append('audio', file);
       for (const [k, v] of Object.entries(this.meta)) { if (v) form.append(k, v); }
@@ -274,6 +278,7 @@ function dashboard() {
         if (!res.ok) throw new Error(data.detail || 'Upload failed');
         this.$refs.fileInput.value = '';
         this.fileName = '';
+        this.uploadSuccess = 'File submitted for transcription. You can upload another file now.';
         await this.refresh();
       } catch (e) {
         this.uploadError = e.message;
